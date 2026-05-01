@@ -3,10 +3,10 @@
 A full-stack web application to track job applications.
 
 ## Tech Stack
-- Backend: Python, FastAPI
+- Backend: Python, FastAPI ✅
 - Database: PostgreSQL ✅
 - ORM: SQLAlchemy ✅
-- Frontend: React (coming soon)
+- Frontend: React ✅
 
 ## API Endpoints
 | Method | Endpoint | Description |
@@ -22,12 +22,27 @@ A full-stack web application to track job applications.
 | main.py | API endpoints live here |
 | models.py | Defines what a Job looks like in the database |
 | database.py | Handles the connection to PostgreSQL |
+| frontend/src/App.js | React frontend UI |
 
 ## Status
-🚧 In progress — Day 3 complete
+✅ Week 1 complete — Full stack app working!
 
 ## What's built so far
-- FastAPI server running locally
-- 4 working API endpoints
-- Jobs permanently saved in PostgreSQL database
-- Data survives server restarts
+- FastAPI backend with 4 working API endpoints
+- PostgreSQL database — data saved permanently
+- React frontend with a form to add jobs
+- Full stack connected — frontend talks to backend talks to database
+- Deployed locally and fully functional
+
+## How to run locally
+
+### Backend
+cd my-project
+venv\Scripts\activate
+uvicorn main:app --reload
+
+### Frontend
+cd my-project\frontend
+npm start
+
+Then open http://localhost:3000
