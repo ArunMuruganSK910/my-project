@@ -17,6 +17,7 @@ function App() {
   };
 
   const addJob = async () => {
+    if (!company || !role) return;
     await fetch("http://localhost:8000/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -25,6 +26,26 @@ function App() {
     setCompany("");
     setRole("");
     setStatus("Applied");
+    fetchJobs();
+  };
+
+  const deleteJob = async (id) => {
+    await fetch(`http://localhost:8000/jobs/${id}`, {
+      method: "DELETE",
+    });
+    fetchJobs();
+  };
+
+  const updateStatus = async (job, newStatus) => {
+    await fetch(`http://localhost:8000/jobs/${job.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company: job.company,
+        role: job.role,
+        status: newStatus,
+      }),
+    });
     fetchJobs();
   };
 
@@ -70,6 +91,8 @@ function App() {
             <th>Company</th>
             <th>Role</th>
             <th>Status</th>
+            <th>Update Status</th>
+            <th>Delete</th>
           </tr>
         </thead>
         <tbody>
@@ -79,6 +102,26 @@ function App() {
               <td>{job.company}</td>
               <td>{job.role}</td>
               <td>{job.status}</td>
+              <td>
+                <select
+                  value={job.status}
+                  onChange={(e) => updateStatus(job, e.target.value)}
+                  style={{ padding: "4px" }}
+                >
+                  <option>Applied</option>
+                  <option>Interview</option>
+                  <option>Rejected</option>
+                  <option>Offer</option>
+                </select>
+              </td>
+              <td>
+                <button
+                  onClick={() => deleteJob(job.id)}
+                  style={{ padding: "4px 8px", cursor: "pointer", color: "red" }}
+                >
+                  Delete
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
