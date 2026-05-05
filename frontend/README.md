@@ -1,6 +1,6 @@
 # Job Tracker App
 
-A full-stack web application to track job applications.
+A full-stack web application to track job applications — built with a luxury beach aesthetic.
 
 ## Tech Stack
 - Backend: Python, FastAPI ✅
@@ -25,16 +25,24 @@ A full-stack web application to track job applications.
 | models.py | Defines the Job table in PostgreSQL |
 | database.py | Handles PostgreSQL connection |
 | frontend/src/App.js | React frontend UI |
+| frontend/src/video.mp4 | Background hero video |
+| frontend/src/music.mp3 | Ambient music player |
 
 ## Features
-- Add a new job application
-- View all applications in a table
-- Update application status (Applied, Interview, Rejected, Offer)
-- Delete an application
+- Full CRUD — add, view, update, delete job applications
 - Data saved permanently in PostgreSQL
+- Ocean wave video background hero
+- Glassmorphism UI — frosted glass cards and sidebar
+- Animated music visualizer with volume control
+- Sidebar with navigation, search, quick stats, filter and sort
+- Animated number counters
+- Progress bar per application
+- Success rate tracker
+- Colour coded status badges
+- Smooth animations and hover effects
 
 ## Status
-🚧 In progress — Day 5 complete
+🚧 In progress — Day 6 complete
 
 ## How to run locally
 
