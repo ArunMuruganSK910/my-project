@@ -51,8 +51,6 @@ const FILTERS = ["All", "Applied", "Interview", "Offer", "Rejected"];
 export default function App() {
   const [jobs, setJobs]               = useState([]);
   const [loading, setLoading]         = useState(true);
-  const [loading, setLoading]         = useState(true);
-  const [loading, setLoading]         = useState(true);
   const [company, setCompany]         = useState("");
   const [role, setRole]               = useState("");
   const [status, setStatus]           = useState("Applied");
