@@ -8,6 +8,12 @@ from typing import Optional
 
 Base.metadata.create_all(bind=engine)
 
+# Add interview_date column if it doesn't exist
+from sqlalchemy import text
+with engine.connect() as conn:
+    conn.execute(text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS interview_date VARCHAR"))
+    conn.commit()
+
 app = FastAPI()
 
 app.add_middleware(
