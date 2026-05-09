@@ -55,14 +55,14 @@ export default function App() {
   useEffect(() => { fetchJobs(); }, []);
 
   const fetchJobs = async () => {
-    const r = await fetch("http://localhost:8000/jobs");
+    const r = await fetch("https://jobtracker-backend-qg6u.onrender.com/jobs");
     const d = await r.json();
     setJobs(d.jobs);
   };
 
   const addJob = async () => {
     if (!company || !role) return;
-    const r = await fetch("http://localhost:8000/jobs", {
+    const r = await fetch("https://jobtracker-backend-qg6u.onrender.com/jobs", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ company, role, status }),
     });
@@ -75,12 +75,12 @@ export default function App() {
   };
 
   const deleteJob = async (id) => {
-    await fetch(`http://localhost:8000/jobs/${id}`, { method:"DELETE" });
+    await fetch(`https://jobtracker-backend-qg6u.onrender.com/jobs/${id}`, { method:"DELETE" });
     fetchJobs();
   };
 
   const updateStatus = async (job, s) => {
-    await fetch(`http://localhost:8000/jobs/${job.id}`, {
+    await fetch(`https://jobtracker-backend-qg6u.onrender.com/jobs/${job.id}`, {
       method:"PUT", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ company:job.company, role:job.role, status:s }),
     });
