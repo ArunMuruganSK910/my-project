@@ -9,10 +9,7 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from datetime import date
 import os
-import json
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 
 # ─── Google Calendar Function ────────────────────────────────────────────────
 
@@ -51,69 +48,59 @@ def add_to_google_calendar(company: str, role: str, interview_date):
 
 def send_interview_reminder(company: str, role: str, interview_date):
     try:
-        EMAIL_ADDRESS  = os.getenv("EMAIL_ADDRESS")
-        EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-        if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
-            print("❌ Email env vars not set")
-            return False
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🎯 Interview Reminder: {company} — {role}"
-        msg["From"]    = EMAIL_ADDRESS
-        msg["To"]      = EMAIL_ADDRESS
-
-        html = f"""
-        <div style="font-family:'Helvetica Neue',sans-serif;max-width:600px;margin:0 auto;background:linear-gradient(135deg,#c8e8f5,#ddf0f8);border-radius:24px;overflow:hidden;">
-          <div style="background:linear-gradient(135deg,#03045e,#0096c7);padding:40px;text-align:center;">
-            <h1 style="color:#fff;font-size:12px;letter-spacing:8px;margin:0 0 12px;">CAREER TRACKER</h1>
-            <p style="color:#90e0ef;font-size:10px;letter-spacing:4px;margin:0;">INTERVIEW REMINDER</p>
-          </div>
-          <div style="padding:40px;">
-            <div style="background:rgba(255,255,255,0.7);border-radius:16px;padding:28px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.9);">
-              <p style="font-size:10px;letter-spacing:4px;color:#0096c7;margin:0 0 8px;font-weight:700;">COMPANY</p>
-              <p style="font-size:24px;font-weight:900;color:#03045e;margin:0;letter-spacing:2px;">{company.upper()}</p>
+        resend.api_key = os.getenv("RESEND_API_KEY")
+        params = {
+            "from": "Career Tracker <onboarding@resend.dev>",
+            "to": [os.getenv("EMAIL_ADDRESS", "arunmuruganskprof@gmail.com")],
+            "subject": f"🎯 Interview Reminder: {company} — {role}",
+            "html": f"""
+            <div style="font-family:'Helvetica Neue',sans-serif;max-width:600px;margin:0 auto;background:linear-gradient(135deg,#c8e8f5,#ddf0f8);border-radius:24px;overflow:hidden;">
+              <div style="background:linear-gradient(135deg,#03045e,#0096c7);padding:40px;text-align:center;">
+                <h1 style="color:#fff;font-size:12px;letter-spacing:8px;margin:0 0 12px;">CAREER TRACKER</h1>
+                <p style="color:#90e0ef;font-size:10px;letter-spacing:4px;margin:0;">INTERVIEW REMINDER</p>
+              </div>
+              <div style="padding:40px;">
+                <div style="background:rgba(255,255,255,0.7);border-radius:16px;padding:28px;margin-bottom:20px;">
+                  <p style="font-size:10px;letter-spacing:4px;color:#0096c7;margin:0 0 8px;font-weight:700;">COMPANY</p>
+                  <p style="font-size:24px;font-weight:900;color:#03045e;margin:0;">{company.upper()}</p>
+                </div>
+                <div style="background:rgba(255,255,255,0.7);border-radius:16px;padding:28px;margin-bottom:20px;">
+                  <p style="font-size:10px;letter-spacing:4px;color:#0096c7;margin:0 0 8px;font-weight:700;">ROLE</p>
+                  <p style="font-size:18px;font-weight:700;color:#03045e;margin:0;">{role}</p>
+                </div>
+                <div style="background:rgba(244,162,97,0.15);border-radius:16px;padding:28px;border:1px solid rgba(244,162,97,0.4);">
+                  <p style="font-size:10px;letter-spacing:4px;color:#f4a261;margin:0 0 8px;font-weight:700;">INTERVIEW DATE</p>
+                  <p style="font-size:22px;font-weight:900;color:#03045e;margin:0;">{interview_date}</p>
+                  <p style="font-size:12px;color:#f4a261;margin:8px 0 0;font-weight:700;">⏰ TOMORROW — BE PREPARED!</p>
+                </div>
+                <div style="text-align:center;margin-top:32px;">
+                  <a href="https://jobtracker-frontend-j1u4.onrender.com" style="background:linear-gradient(135deg,#0096c7,#48cae4);color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-size:10px;font-weight:800;letter-spacing:3px;">VIEW IN CAREER TRACKER</a>
+                </div>
+              </div>
+              <div style="padding:20px;text-align:center;">
+                <p style="font-size:9px;letter-spacing:3px;color:#4a7a99;margin:0;">CAREER TRACKER · RIDE THE WAVE 2025</p>
+              </div>
             </div>
-            <div style="background:rgba(255,255,255,0.7);border-radius:16px;padding:28px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.9);">
-              <p style="font-size:10px;letter-spacing:4px;color:#0096c7;margin:0 0 8px;font-weight:700;">ROLE</p>
-              <p style="font-size:18px;font-weight:700;color:#03045e;margin:0;">{role}</p>
-            </div>
-            <div style="background:rgba(244,162,97,0.15);border-radius:16px;padding:28px;border:1px solid rgba(244,162,97,0.4);">
-              <p style="font-size:10px;letter-spacing:4px;color:#f4a261;margin:0 0 8px;font-weight:700;">INTERVIEW DATE</p>
-              <p style="font-size:22px;font-weight:900;color:#03045e;margin:0;">{interview_date}</p>
-              <p style="font-size:12px;color:#f4a261;margin:8px 0 0;font-weight:700;">⏰ TOMORROW — BE PREPARED!</p>
-            </div>
-            <div style="text-align:center;margin-top:32px;">
-              <a href="https://jobtracker-frontend-j1u4.onrender.com" style="background:linear-gradient(135deg,#0096c7,#48cae4);color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-size:10px;font-weight:800;letter-spacing:3px;">VIEW IN CAREER TRACKER</a>
-            </div>
-          </div>
-          <div style="padding:20px;text-align:center;border-top:1px solid rgba(255,255,255,0.4);">
-            <p style="font-size:9px;letter-spacing:3px;color:#4a7a99;margin:0;">CAREER TRACKER · RIDE THE WAVE 2025</p>
-          </div>
-        </div>
-        """
-
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            smtp.sendmail(EMAIL_ADDRESS, EMAIL_ADDRESS, msg.as_string())
-
+            """
+        }
+        resend.Emails.send(params)
         print(f"✅ Email reminder sent for {company} interview!")
         return True
     except Exception as e:
         print(f"❌ Email error: {e}")
         return False
 
-# ─── Check & Send Reminders (called on startup + via endpoint) ───────────────
+# ─── Check & Send Reminders ───────────────────────────────────────────────────
 
 def check_and_send_reminders(db: Session):
     from datetime import date, timedelta
+    from datetime import datetime
     tomorrow = date.today() + timedelta(days=1)
     jobs = db.query(JobModel).all()
     for job in jobs:
         if job.interview_date:
             interview = job.interview_date
             if isinstance(interview, str):
-                from datetime import datetime
                 interview = datetime.strptime(interview[:10], "%Y-%m-%d").date()
             if interview == tomorrow:
                 print(f"📧 Sending reminder for {job.company} interview tomorrow...")
@@ -158,7 +145,6 @@ def home():
 
 @app.get("/send-reminders")
 def trigger_reminders(db: Session = Depends(get_db)):
-    """Manually trigger email reminders — call this daily via a cron job"""
     check_and_send_reminders(db)
     return {"message": "Reminders checked and sent!"}
 
