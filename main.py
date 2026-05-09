@@ -17,7 +17,6 @@ def add_to_google_calendar(company: str, role: str, interview_date):
     try:
         SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-        # Render stores secret files at /etc/secrets/
         render_path = '/etc/secrets/google_credentials.json'
         local_path  = 'credentials/google_credentials.json'
 
@@ -31,6 +30,8 @@ def add_to_google_calendar(company: str, role: str, interview_date):
             )
 
         service = build('calendar', 'v3', credentials=creds)
+
+        # ✅ Your actual Google Calendar ID
         CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID", "arunmuruganskprof@gmail.com")
 
         event = {
@@ -106,6 +107,11 @@ def add_job(job: Job, db: Session = Depends(get_db)):
     db.add(new_job)
     db.commit()
     db.refresh(new_job)
+
+    # ✅ Trigger calendar when adding a new job with interview date
+    if job.interview_date:
+        add_to_google_calendar(job.company, job.role, job.interview_date)
+
     return {"message": "Job added!", "job": new_job}
 
 @app.get("/jobs/{job_id}")
@@ -134,7 +140,7 @@ def update_job(job_id: int, job: Job, db: Session = Depends(get_db)):
     existing_job.role = job.role
     existing_job.status = job.status
 
-    # Only trigger calendar if interview_date is new or changed
+    # ✅ Trigger calendar only when interview_date is new or changed
     if job.interview_date and job.interview_date != existing_job.interview_date:
         existing_job.interview_date = job.interview_date
         add_to_google_calendar(
