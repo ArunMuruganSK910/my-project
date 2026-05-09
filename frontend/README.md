@@ -56,3 +56,7 @@ cd my-project\frontend
 npm start
 
 Then open http://localhost:3000
+## Live Demo
+- Frontend: https://jobtracker-frontend-j1u4.onrender.com
+- Backend API: https://jobtracker-backend-qg6u.onrender.com
+- API Docs: https://jobtracker-backend-qg6u.onrender.com/docs
