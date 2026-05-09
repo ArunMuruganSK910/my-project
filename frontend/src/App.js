@@ -50,6 +50,9 @@ const FILTERS = ["All", "Applied", "Interview", "Offer", "Rejected"];
 
 export default function App() {
   const [jobs, setJobs]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [loading, setLoading]         = useState(true);
+  const [loading, setLoading]         = useState(true);
   const [company, setCompany]         = useState("");
   const [role, setRole]               = useState("");
   const [status, setStatus]           = useState("Applied");
@@ -66,12 +69,14 @@ export default function App() {
   const jobsRef  = useRef(null);
   const addRef   = useRef(null);
 
-  useEffect(() => { fetchJobs(); }, []);
+  useEffect(() => { fetchJobs(true); }, []);
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (initial = false) => {
+    if (initial) setLoading(true);
     const r = await fetch(`${API}/jobs`);
     const d = await r.json();
     setJobs(d.jobs);
+    if (initial) setLoading(false);
   };
 
   const addJob = async () => {
@@ -151,6 +156,53 @@ export default function App() {
     const diff = Math.ceil((new Date(date) - new Date()) / (1000*60*60*24));
     return diff >= 0 && diff <= 3;
   };
+
+  if (loading) return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#c8e8f5 0%,#ddf0f8 50%,#c0e4f2 100%)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif" }}>
+      <style>{`
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes bars  { 0%,100%{height:8px} 50%{height:28px} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        .lb1 { animation:bars 0.8s ease-in-out infinite; }
+        .lb2 { animation:bars 0.8s ease-in-out 0.15s infinite; }
+        .lb3 { animation:bars 0.8s ease-in-out 0.3s infinite; }
+      `}</style>
+
+      <div style={{ animation:"float 3s ease-in-out infinite", textAlign:"center" }}>
+        {/* Logo */}
+        <div style={{ fontSize:"11px", letterSpacing:"8px", color:"#0096c7", marginBottom:"32px", fontWeight:"900", animation:"fadeUp 0.6s ease both" }}>
+          CAREER TRACKER
+        </div>
+
+        {/* Wave bars */}
+        <div style={{ display:"flex", alignItems:"flex-end", gap:"5px", height:"36px", justifyContent:"center", marginBottom:"40px" }}>
+          {[1,2,3,4,5,6,7,8,9].map(i => (
+            <div key={i} className={`lb${(i%3)+1}`}
+              style={{ width:"5px", background:`linear-gradient(180deg,#48cae4,#0096c7)`, borderRadius:"3px", minHeight:"4px", opacity: 0.5 + (i%3)*0.2 }} />
+          ))}
+        </div>
+
+        {/* Glass card */}
+        <div style={{ background:"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"24px", padding:"40px 60px", boxShadow:"0 8px 32px rgba(0,150,199,0.15)", animation:"fadeUp 0.6s ease 0.2s both" }}>
+          <div style={{ fontSize:"32px", marginBottom:"16px" }}>🌊</div>
+          <div style={{ fontSize:"13px", letterSpacing:"4px", color:"#03045e", fontWeight:"700", marginBottom:"8px" }}>
+            WAKING UP
+          </div>
+          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", animation:"pulse 1.5s infinite" }}>
+            LOADING YOUR APPLICATIONS...
+          </div>
+          <div style={{ marginTop:"24px", height:"3px", width:"200px", background:"rgba(0,150,199,0.1)", borderRadius:"99px", overflow:"hidden" }}>
+            <div style={{ height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", animation:"loading 2s ease-in-out infinite", width:"60%" }} />
+          </div>
+        </div>
+
+        <div style={{ marginTop:"24px", fontSize:"9px", letterSpacing:"3px", color:"#90a8b8", animation:"fadeUp 0.6s ease 0.4s both" }}>
+          FREE TIER — FIRST LOAD MAY TAKE ~30s
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#c8e8f5 0%,#ddf0f8 50%,#c0e4f2 100%)", color:"#03045e", fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif", display:"flex", flexDirection:"column" }}>
