@@ -23,6 +23,7 @@ class Job(BaseModel):
     company: str
     role: str
     status: str
+    interview_date: str = None
 
 @app.get("/")
 def home():
@@ -35,7 +36,7 @@ def get_jobs(db: Session = Depends(get_db)):
 
 @app.post("/jobs")
 def add_job(job: Job, db: Session = Depends(get_db)):
-    new_job = JobModel(company=job.company, role=job.role, status=job.status)
+   new_job = JobModel(company=job.company, role=job.role, status=job.status, interview_date=job.interview_date)
     db.add(new_job)
     db.commit()
     db.refresh(new_job)
@@ -65,6 +66,7 @@ def update_job(job_id: int, job: Job, db: Session = Depends(get_db)):
     existing_job.company = job.company
     existing_job.role = job.role
     existing_job.status = job.status
+    existing_job.interview_date = job.interview_date
     db.commit()
     db.refresh(existing_job)
     return {"message": "Job updated!", "job": existing_job}
