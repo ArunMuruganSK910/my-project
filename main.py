@@ -31,7 +31,7 @@ def add_to_google_calendar(company: str, role: str, interview_date):
             )
 
         service = build('calendar', 'v3', credentials=creds)
-        CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID", "primary")
+        CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID", "arunmuruganskprof@gmail.com")
 
         event = {
             'summary': f'Interview at {company} — {role}',
