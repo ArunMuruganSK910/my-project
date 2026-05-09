@@ -376,7 +376,7 @@ export default function App() {
                   style={{ background:flash===job.id?"rgba(0,150,199,0.08)":"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", border:`1px solid ${flash===job.id?"rgba(0,150,199,0.4)":"rgba(255,255,255,0.6)"}`, borderLeft:`4px solid ${STATUS[job.status]?.color}`, borderRadius:"18px", padding:"22px 28px", boxShadow:`0 4px 24px ${STATUS[job.status]?.glow},inset 0 1px 0 rgba(255,255,255,0.7)`, transition:"all 0.3s cubic-bezier(.4,0,.2,1)", animation:`fadeUp 0.4s ease ${idx*0.04}s both`, ...(isUrgent(job.interview_date)?{animation:"urgentPulse 2s ease-in-out infinite"}:{}) }}>
 
                   <div style={{ display:"flex", alignItems:"center", gap:"14px", flexWrap:"wrap", marginBottom:"16px" }}>
-                    <span style={{ fontSize:"10px", color:"rgba(0,150,199,0.5)", minWidth:"28px", fontWeight:"700" }}>#{job.id}</span>
+                    <span style={{ fontSize:"10px", color:"rgba(0,150,199,0.5)", minWidth:"28px", fontWeight:"700" }}>#{idx + 1}</span>
                     <span style={{ flex:2, fontSize:"14px", fontWeight:"800", letterSpacing:"2px", color:"#03045e" }}>{job.company.toUpperCase()}</span>
                     <span style={{ flex:2, fontSize:"12px", color:"#0096c7", fontWeight:"500" }}>{job.role}</span>
                     {job.interview_date && (
