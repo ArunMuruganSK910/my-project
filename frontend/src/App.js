@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import video from "./video.mp4";
 import music from "./music.mp3";
 
+const API = "https://jobtracker-backend-qg6u.onrender.com";
+
 function AnimatedNumber({ value }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
@@ -20,17 +22,28 @@ function ProgressBar({ status }) {
   const percent = { Applied: 25, Interview: 60, Offer: 100, Rejected: 100 }[status];
   const color = status === "Rejected" ? "#e76f51" : status === "Offer" ? "#2a9d8f" : "linear-gradient(90deg,#48cae4,#0096c7)";
   return (
-    <div style={{ position:"relative", width:"100%", background:"rgba(255,255,255,0.15)", borderRadius:"99px", height:"6px", overflow:"hidden" }}>
-      <div style={{ width:`${percent}%`, height:"100%", background:color, borderRadius:"99px", transition:"width 1.2s cubic-bezier(.4,0,.2,1)", boxShadow: status==="Offer" ? "0 0 10px rgba(42,157,143,0.8)" : "0 0 8px rgba(72,202,228,0.6)" }} />
+    <div style={{ width:"100%", background:"rgba(255,255,255,0.15)", borderRadius:"99px", height:"6px", overflow:"hidden" }}>
+      <div style={{ width:`${percent}%`, height:"100%", background:color, borderRadius:"99px", transition:"width 1.2s cubic-bezier(.4,0,.2,1)" }} />
     </div>
   );
 }
 
+function DaysUntil({ date }) {
+  if (!date) return null;
+  const today = new Date();
+  const interview = new Date(date);
+  const diff = Math.ceil((interview - today) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return <span style={{ fontSize:"9px", color:"#e76f51", letterSpacing:"2px", fontWeight:"700" }}>PASSED</span>;
+  if (diff === 0) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700" }}>TODAY!</span>;
+  if (diff <= 3) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700", animation:"pulse 1s infinite" }}>{diff}D LEFT</span>;
+  return <span style={{ fontSize:"9px", color:"#2a9d8f", letterSpacing:"2px", fontWeight:"700" }}>{diff} DAYS</span>;
+}
+
 const STATUS = {
-  Applied:   { color:"#0096c7", bg:"rgba(0,150,199,0.15)",  border:"rgba(0,150,199,0.4)",   glow:"rgba(0,150,199,0.15)"   },
-  Interview: { color:"#f4a261", bg:"rgba(244,162,97,0.15)", border:"rgba(244,162,97,0.4)",   glow:"rgba(244,162,97,0.15)"  },
-  Offer:     { color:"#2a9d8f", bg:"rgba(42,157,143,0.15)", border:"rgba(42,157,143,0.4)",   glow:"rgba(42,157,143,0.15)"  },
-  Rejected:  { color:"#e76f51", bg:"rgba(231,111,81,0.15)", border:"rgba(231,111,81,0.4)",   glow:"rgba(231,111,81,0.15)"  },
+  Applied:   { color:"#0096c7", bg:"rgba(0,150,199,0.15)",  border:"rgba(0,150,199,0.4)",  glow:"rgba(0,150,199,0.15)"  },
+  Interview: { color:"#f4a261", bg:"rgba(244,162,97,0.15)", border:"rgba(244,162,97,0.4)", glow:"rgba(244,162,97,0.15)" },
+  Offer:     { color:"#2a9d8f", bg:"rgba(42,157,143,0.15)", border:"rgba(42,157,143,0.4)", glow:"rgba(42,157,143,0.15)" },
+  Rejected:  { color:"#e76f51", bg:"rgba(231,111,81,0.15)", border:"rgba(231,111,81,0.4)", glow:"rgba(231,111,81,0.15)" },
 };
 
 const FILTERS = ["All", "Applied", "Interview", "Offer", "Rejected"];
@@ -40,6 +53,7 @@ export default function App() {
   const [company, setCompany]         = useState("");
   const [role, setRole]               = useState("");
   const [status, setStatus]           = useState("Applied");
+  const [interviewDate, setInterviewDate] = useState("");
   const [flash, setFlash]             = useState(null);
   const [filter, setFilter]           = useState("All");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -55,34 +69,34 @@ export default function App() {
   useEffect(() => { fetchJobs(); }, []);
 
   const fetchJobs = async () => {
-    const r = await fetch("https://jobtracker-backend-qg6u.onrender.com/jobs");
+    const r = await fetch(`${API}/jobs`);
     const d = await r.json();
     setJobs(d.jobs);
   };
 
   const addJob = async () => {
     if (!company || !role) return;
-    const r = await fetch("https://jobtracker-backend-qg6u.onrender.com/jobs", {
+    const r = await fetch(`${API}/jobs`, {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ company, role, status }),
+      body: JSON.stringify({ company, role, status, interview_date: interviewDate || null }),
     });
     const d = await r.json();
     setFlash(d.job.id);
     setTimeout(() => setFlash(null), 1500);
-    setCompany(""); setRole(""); setStatus("Applied");
+    setCompany(""); setRole(""); setStatus("Applied"); setInterviewDate("");
     fetchJobs();
     jobsRef.current?.scrollIntoView({ behavior:"smooth" });
   };
 
   const deleteJob = async (id) => {
-    await fetch(`https://jobtracker-backend-qg6u.onrender.com/jobs/${id}`, { method:"DELETE" });
+    await fetch(`${API}/jobs/${id}`, { method:"DELETE" });
     fetchJobs();
   };
 
   const updateStatus = async (job, s) => {
-    await fetch(`https://jobtracker-backend-qg6u.onrender.com/jobs/${job.id}`, {
+    await fetch(`${API}/jobs/${job.id}`, {
       method:"PUT", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ company:job.company, role:job.role, status:s }),
+      body: JSON.stringify({ company:job.company, role:job.role, status:s, interview_date:job.interview_date }),
     });
     fetchJobs();
   };
@@ -105,6 +119,12 @@ export default function App() {
   const successRate = jobs.length > 0
     ? Math.round((jobs.filter(j=>j.status==="Offer").length / jobs.length) * 100) : 0;
 
+  const upcomingInterviews = jobs.filter(j => {
+    if (!j.interview_date) return false;
+    const diff = Math.ceil((new Date(j.interview_date) - new Date()) / (1000*60*60*24));
+    return diff >= 0 && diff <= 7;
+  }).length;
+
   let displayed = filter==="All" ? [...jobs] : jobs.filter(j=>j.status===filter);
   if (search) displayed = displayed.filter(j =>
     j.company.toLowerCase().includes(search.toLowerCase()) ||
@@ -113,6 +133,7 @@ export default function App() {
   if (sortBy==="newest")  displayed = displayed.reverse();
   if (sortBy==="company") displayed = displayed.sort((a,b)=>a.company.localeCompare(b.company));
   if (sortBy==="status")  displayed = displayed.sort((a,b)=>a.status.localeCompare(b.status));
+  if (sortBy==="date")    displayed = displayed.sort((a,b)=> a.interview_date ? -1 : 1);
 
   const scrollTo = (ref, section) => {
     ref?.current?.scrollIntoView({ behavior:"smooth" });
@@ -125,80 +146,78 @@ export default function App() {
     { id:"applications", label:"APPLICATIONS", ref:jobsRef },
   ];
 
+  const isUrgent = (date) => {
+    if (!date) return false;
+    const diff = Math.ceil((new Date(date) - new Date()) / (1000*60*60*24));
+    return diff >= 0 && diff <= 3;
+  };
+
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#c8e8f5 0%,#ddf0f8 50%,#c0e4f2 100%)", color:"#03045e", fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif", display:"flex", flexDirection:"column" }}>
 
       <style>{`
-        @keyframes fadeUp    { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes float     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
-        @keyframes slideIn   { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes shimmer   { 0%{background-position:200% center} 100%{background-position:-200% center} }
-        @keyframes glow      { 0%,100%{box-shadow:0 0 20px rgba(0,150,199,0.3)} 50%{box-shadow:0 0 40px rgba(0,150,199,0.6)} }
-        @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes bars      { 0%,100%{height:8px} 50%{height:20px} }
-
-        .glass {
-          background: rgba(255,255,255,0.25) !important;
-          backdrop-filter: blur(20px) !important;
-          -webkit-backdrop-filter: blur(20px) !important;
-          border: 1px solid rgba(255,255,255,0.5) !important;
-          box-shadow: 0 8px 32px rgba(0,150,199,0.12), inset 0 1px 0 rgba(255,255,255,0.6) !important;
-        }
-        .glass-dark {
-          background: rgba(255,255,255,0.12) !important;
-          backdrop-filter: blur(24px) !important;
-          -webkit-backdrop-filter: blur(24px) !important;
-          border: 1px solid rgba(255,255,255,0.25) !important;
-          box-shadow: 0 8px 32px rgba(0,150,199,0.1), inset 0 1px 0 rgba(255,255,255,0.3) !important;
-        }
+        @keyframes fadeUp  { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes slideIn { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes glow    { 0%,100%{box-shadow:0 0 20px rgba(0,150,199,0.3)} 50%{box-shadow:0 0 40px rgba(0,150,199,0.6)} }
+        @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes urgentPulse { 0%,100%{box-shadow:0 4px 24px rgba(244,162,97,0.2)} 50%{box-shadow:0 4px 40px rgba(244,162,97,0.5)} }
+        @keyframes bars    { 0%,100%{height:8px} 50%{height:20px} }
+        .glass { background:rgba(255,255,255,0.25)!important; backdrop-filter:blur(20px)!important; border:1px solid rgba(255,255,255,0.5)!important; box-shadow:0 8px 32px rgba(0,150,199,0.12),inset 0 1px 0 rgba(255,255,255,0.6)!important; }
         .nav-item:hover  { background:rgba(0,150,199,0.12)!important; color:#0096c7!important; transform:translateX(4px)!important; }
-        .job-card:hover  { transform:translateY(-4px) scale(1.005)!important; box-shadow:0 24px 60px rgba(0,150,199,0.18)!important; }
+        .job-card:hover  { transform:translateY(-4px) scale(1.005)!important; }
         .stat-pill:hover { transform:translateX(4px) scale(1.02)!important; }
         .del-btn:hover   { background:rgba(231,111,81,0.15)!important; border-color:#e76f51!important; color:#e76f51!important; }
         .add-btn:hover   { transform:translateY(-2px) scale(1.03)!important; box-shadow:0 12px 40px rgba(0,150,199,0.5)!important; }
+        .play-btn:hover  { transform:scale(1.1)!important; }
         .filter-chip:hover { transform:translateX(4px)!important; }
-        .play-btn:hover  { transform:scale(1.1)!important; box-shadow:0 8px 24px rgba(0,150,199,0.5)!important; }
         input::placeholder { color:rgba(3,4,94,0.3); }
-        select option    { background:#e8f4f8; color:#03045e; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: opacity(0.5); cursor:pointer; }
+        select option { background:#e8f4f8; color:#03045e; }
         ::-webkit-scrollbar { width:3px; }
         ::-webkit-scrollbar-thumb { background:rgba(0,150,199,0.3); border-radius:99px; }
-        .bar1 { animation: bars 0.8s ease-in-out infinite; }
-        .bar2 { animation: bars 0.8s ease-in-out 0.15s infinite; }
-        .bar3 { animation: bars 0.8s ease-in-out 0.3s infinite; }
+        .bar1 { animation:bars 0.8s ease-in-out infinite; }
+        .bar2 { animation:bars 0.8s ease-in-out 0.15s infinite; }
+        .bar3 { animation:bars 0.8s ease-in-out 0.3s infinite; }
       `}</style>
 
-      {/* ── Topbar ── */}
+      {/* Topbar */}
       <nav className="glass" style={{ position:"sticky", top:0, zIndex:99, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
-          <button onClick={() => setSidebarOpen(p=>!p)}
-            style={{ background:"rgba(0,150,199,0.1)", border:"1px solid rgba(0,150,199,0.25)", borderRadius:"10px", color:"#0096c7", width:"38px", height:"38px", cursor:"pointer", fontSize:"16px", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.3s", backdropFilter:"blur(8px)" }}>
-            {sidebarOpen ? "✕" : "☰"}
+          <button onClick={()=>setSidebarOpen(p=>!p)}
+            style={{ background:"rgba(0,150,199,0.1)", border:"1px solid rgba(0,150,199,0.25)", borderRadius:"10px", color:"#0096c7", width:"38px", height:"38px", cursor:"pointer", fontSize:"16px", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.3s" }}>
+            {sidebarOpen?"✕":"☰"}
           </button>
-          <span style={{ fontSize:"12px", fontWeight:"900", letterSpacing:"7px", color:"#03045e", textShadow:"0 1px 2px rgba(255,255,255,0.8)" }}>CAREER TRACKER</span>
+          <span style={{ fontSize:"12px", fontWeight:"900", letterSpacing:"7px", color:"#03045e" }}>CAREER TRACKER</span>
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
-          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", background:"rgba(0,150,199,0.1)", padding:"6px 16px", borderRadius:"99px", border:"1px solid rgba(0,150,199,0.25)", backdropFilter:"blur(8px)", fontWeight:"700" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+          {upcomingInterviews > 0 && (
+            <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#f4a261", background:"rgba(244,162,97,0.1)", padding:"6px 14px", borderRadius:"99px", border:"1px solid rgba(244,162,97,0.3)", fontWeight:"700", animation:"pulse 2s infinite" }}>
+              {upcomingInterviews} INTERVIEW{upcomingInterviews>1?"S":""} THIS WEEK
+            </div>
+          )}
+          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", background:"rgba(0,150,199,0.08)", padding:"6px 16px", borderRadius:"99px", border:"1px solid rgba(0,150,199,0.2)", fontWeight:"700" }}>
             SUCCESS {successRate}%
           </div>
           {["Applied","Interview","Offer","Rejected"].map(s => (
-            <span key={s} style={{ fontSize:"9px", letterSpacing:"2px", padding:"5px 12px", borderRadius:"99px", background:STATUS[s].bg, color:STATUS[s].color, border:`1px solid ${STATUS[s].border}`, backdropFilter:"blur(8px)", fontWeight:"700" }}>{s.toUpperCase()}</span>
+            <span key={s} style={{ fontSize:"9px", letterSpacing:"2px", padding:"5px 12px", borderRadius:"99px", background:STATUS[s].bg, color:STATUS[s].color, border:`1px solid ${STATUS[s].border}`, fontWeight:"700" }}>{s.toUpperCase()}</span>
           ))}
         </div>
       </nav>
 
       <div style={{ display:"flex", flex:1 }}>
 
-        {/* ── Sidebar ── */}
+        {/* Sidebar */}
         {sidebarOpen && (
-          <aside style={{ width:"260px", background:"rgba(255,255,255,0.2)", backdropFilter:"blur(32px)", WebkitBackdropFilter:"blur(32px)", borderRight:"1px solid rgba(255,255,255,0.4)", display:"flex", flexDirection:"column", position:"sticky", top:"57px", height:"calc(100vh - 57px)", overflowY:"auto", animation:"slideIn 0.35s cubic-bezier(.4,0,.2,1)", boxShadow:"4px 0 32px rgba(0,150,199,0.08), inset -1px 0 0 rgba(255,255,255,0.5)" }}>
+          <aside style={{ width:"260px", background:"rgba(255,255,255,0.2)", backdropFilter:"blur(32px)", WebkitBackdropFilter:"blur(32px)", borderRight:"1px solid rgba(255,255,255,0.4)", display:"flex", flexDirection:"column", position:"sticky", top:"57px", height:"calc(100vh - 57px)", overflowY:"auto", animation:"slideIn 0.35s cubic-bezier(.4,0,.2,1)", boxShadow:"4px 0 32px rgba(0,150,199,0.08)" }}>
 
             {/* Nav */}
             <div style={{ padding:"28px 16px 20px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 8px", fontWeight:"700" }}>NAVIGATE</p>
               {navItems.map((item,i) => (
                 <button key={item.id} className="nav-item"
-                  onClick={() => item.ref ? scrollTo(item.ref, item.id) : setActiveSection("dashboard")}
-                  style={{ width:"100%", background: activeSection===item.id ? "rgba(0,150,199,0.12)" : "transparent", border:"none", borderRadius:"12px", color: activeSection===item.id ? "#0096c7" : "#4a7a99", padding:"12px 16px", fontSize:"10px", fontWeight: activeSection===item.id ? "800":"400", letterSpacing:"3px", cursor:"pointer", textAlign:"left", marginBottom:"4px", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", borderLeft: activeSection===item.id ? "3px solid #0096c7" : "3px solid transparent", animation:`fadeUp 0.4s ease ${i*0.08}s both` }}>
+                  onClick={()=>item.ref ? scrollTo(item.ref,item.id) : setActiveSection("dashboard")}
+                  style={{ width:"100%", background:activeSection===item.id?"rgba(0,150,199,0.12)":"transparent", border:"none", borderRadius:"12px", color:activeSection===item.id?"#0096c7":"#4a7a99", padding:"12px 16px", fontSize:"10px", fontWeight:activeSection===item.id?"800":"400", letterSpacing:"3px", cursor:"pointer", textAlign:"left", marginBottom:"4px", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", borderLeft:activeSection===item.id?"3px solid #0096c7":"3px solid transparent", animation:`fadeUp 0.4s ease ${i*0.08}s both` }}>
                   {item.label}
                 </button>
               ))}
@@ -207,9 +226,8 @@ export default function App() {
             {/* Search */}
             <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 4px", fontWeight:"700" }}>SEARCH</p>
-              <input placeholder="Company or role..."
-                value={search} onChange={e=>setSearch(e.target.value)}
-                style={{ width:"100%", background:"rgba(255,255,255,0.5)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"12px", color:"#03045e", padding:"10px 14px", fontSize:"12px", outline:"none", boxSizing:"border-box", backdropFilter:"blur(8px)", boxShadow:"inset 0 2px 4px rgba(0,150,199,0.06)" }} />
+              <input placeholder="Company or role..." value={search} onChange={e=>setSearch(e.target.value)}
+                style={{ width:"100%", background:"rgba(255,255,255,0.5)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"12px", color:"#03045e", padding:"10px 14px", fontSize:"12px", outline:"none", boxSizing:"border-box" }} />
             </div>
 
             {/* Quick Stats */}
@@ -217,12 +235,10 @@ export default function App() {
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>QUICK STATS</p>
               {stats.map((s,i) => (
                 <div key={s.label} className="stat-pill"
-                  onClick={() => { setFilter(s.key); scrollTo(jobsRef,"applications"); }}
-                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", borderRadius:"12px", marginBottom:"5px", background: filter===s.key ? "rgba(0,150,199,0.12)" : "rgba(255,255,255,0.3)", border: filter===s.key ? "1px solid rgba(0,150,199,0.3)" : "1px solid rgba(255,255,255,0.5)", cursor:"pointer", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", backdropFilter:"blur(8px)", animation:`fadeUp 0.4s ease ${i*0.06}s both` }}>
-                  <span style={{ fontSize:"9px", letterSpacing:"2px", color: i===0 ? "#0096c7" : "#4a7a99", fontWeight: i===0 ? "700":"400" }}>{s.label}</span>
-                  <span style={{ fontSize:"22px", fontWeight:"900", color: i===0 ? "#0096c7" : "#03045e" }}>
-                    <AnimatedNumber value={s.value} />
-                  </span>
+                  onClick={()=>{ setFilter(s.key); scrollTo(jobsRef,"applications"); }}
+                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", borderRadius:"12px", marginBottom:"5px", background:filter===s.key?"rgba(0,150,199,0.12)":"rgba(255,255,255,0.3)", border:filter===s.key?"1px solid rgba(0,150,199,0.3)":"1px solid rgba(255,255,255,0.5)", cursor:"pointer", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", animation:`fadeUp 0.4s ease ${i*0.06}s both` }}>
+                  <span style={{ fontSize:"9px", letterSpacing:"2px", color:i===0?"#0096c7":"#4a7a99", fontWeight:i===0?"700":"400" }}>{s.label}</span>
+                  <span style={{ fontSize:"22px", fontWeight:"900", color:i===0?"#0096c7":"#03045e" }}><AnimatedNumber value={s.value} /></span>
                 </div>
               ))}
             </div>
@@ -232,12 +248,10 @@ export default function App() {
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>FILTER</p>
               {FILTERS.map((f,i) => (
                 <button key={f} className="filter-chip"
-                  onClick={() => { setFilter(f); scrollTo(jobsRef,"applications"); }}
-                  style={{ width:"100%", background: filter===f ? (f==="All"?"rgba(0,150,199,0.12)":STATUS[f]?.bg) : "rgba(255,255,255,0.25)", border: filter===f ? `1px solid ${f==="All"?"rgba(0,150,199,0.4)":STATUS[f]?.border}` : "1px solid rgba(255,255,255,0.5)", borderRadius:"12px", color: filter===f ? (f==="All"?"#0096c7":STATUS[f]?.color) : "#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight: filter===f?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"5px", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", display:"flex", justifyContent:"space-between", alignItems:"center", backdropFilter:"blur(8px)", animation:`fadeUp 0.4s ease ${i*0.05}s both` }}>
+                  onClick={()=>{ setFilter(f); scrollTo(jobsRef,"applications"); }}
+                  style={{ width:"100%", background:filter===f?(f==="All"?"rgba(0,150,199,0.12)":STATUS[f]?.bg):"rgba(255,255,255,0.25)", border:filter===f?`1px solid ${f==="All"?"rgba(0,150,199,0.4)":STATUS[f]?.border}`:"1px solid rgba(255,255,255,0.5)", borderRadius:"12px", color:filter===f?(f==="All"?"#0096c7":STATUS[f]?.color):"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:filter===f?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"5px", transition:"all 0.25s", display:"flex", justifyContent:"space-between", alignItems:"center", animation:`fadeUp 0.4s ease ${i*0.05}s both` }}>
                   <span>{f.toUpperCase()}</span>
-                  <span style={{ fontWeight:"900", fontSize:"14px" }}>
-                    {f==="All" ? jobs.length : jobs.filter(j=>j.status===f).length}
-                  </span>
+                  <span style={{ fontWeight:"900", fontSize:"14px" }}>{f==="All"?jobs.length:jobs.filter(j=>j.status===f).length}</span>
                 </button>
               ))}
             </div>
@@ -245,58 +259,43 @@ export default function App() {
             {/* Sort */}
             <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 4px", fontWeight:"700" }}>SORT BY</p>
-              {[["newest","NEWEST FIRST"],["company","COMPANY A-Z"],["status","BY STATUS"]].map(([val,label],i) => (
-                <button key={val}
-                  onClick={() => setSortBy(val)}
-                  style={{ width:"100%", background: sortBy===val ? "rgba(0,150,199,0.1)" : "transparent", border:"none", borderRadius:"12px", color: sortBy===val ? "#0096c7" : "#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight: sortBy===val?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"3px", transition:"all 0.25s", borderLeft: sortBy===val ? "3px solid #0096c7" : "3px solid transparent", animation:`fadeUp 0.4s ease ${i*0.07}s both` }}>
+              {[["newest","NEWEST FIRST"],["company","COMPANY A-Z"],["status","BY STATUS"],["date","BY DATE"]].map(([val,label],i) => (
+                <button key={val} onClick={()=>setSortBy(val)}
+                  style={{ width:"100%", background:sortBy===val?"rgba(0,150,199,0.1)":"transparent", border:"none", borderRadius:"12px", color:sortBy===val?"#0096c7":"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:sortBy===val?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"3px", transition:"all 0.25s", borderLeft:sortBy===val?"3px solid #0096c7":"3px solid transparent" }}>
                   {label}
                 </button>
               ))}
             </div>
 
-            {/* Music Player */}
+            {/* Music */}
             <div style={{ padding:"20px 16px" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>AMBIENT</p>
-              <audio ref={audioRef} loop>
-                <source src={music} type="audio/mpeg" />
-              </audio>
-              <div style={{ background:"rgba(255,255,255,0.35)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"16px", padding:"16px", backdropFilter:"blur(16px)", boxShadow:"0 4px 20px rgba(0,150,199,0.1), inset 0 1px 0 rgba(255,255,255,0.8)" }}>
+              <audio ref={audioRef} loop><source src={music} type="audio/mpeg" /></audio>
+              <div style={{ background:"rgba(255,255,255,0.35)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"16px", padding:"16px", backdropFilter:"blur(16px)", boxShadow:"0 4px 20px rgba(0,150,199,0.1),inset 0 1px 0 rgba(255,255,255,0.8)" }}>
                 <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", marginBottom:"14px", fontWeight:"800" }}>DREAMY WAVES</div>
-
-                {/* Visualizer bars */}
                 <div style={{ display:"flex", alignItems:"flex-end", gap:"3px", height:"24px", marginBottom:"14px", justifyContent:"center" }}>
-                  {isPlaying ? (
-                    [1,2,3,4,5,6,7].map(i => (
-                      <div key={i} className={`bar${(i%3)+1}`}
-                        style={{ width:"4px", background:"linear-gradient(180deg,#48cae4,#0096c7)", borderRadius:"2px", minHeight:"4px" }} />
-                    ))
-                  ) : (
-                    [1,2,3,4,5,6,7].map(i => (
-                      <div key={i} style={{ width:"4px", height:"4px", background:"rgba(0,150,199,0.3)", borderRadius:"2px" }} />
-                    ))
-                  )}
+                  {isPlaying
+                    ? [1,2,3,4,5,6,7].map(i=><div key={i} className={`bar${(i%3)+1}`} style={{ width:"4px", background:"linear-gradient(180deg,#48cae4,#0096c7)", borderRadius:"2px", minHeight:"4px" }} />)
+                    : [1,2,3,4,5,6,7].map(i=><div key={i} style={{ width:"4px", height:"4px", background:"rgba(0,150,199,0.3)", borderRadius:"2px" }} />)
+                  }
                 </div>
-
                 <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"14px" }}>
                   <button className="play-btn" onClick={toggleMusic}
-                    style={{ background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"99px", color:"#fff", width:"40px", height:"40px", fontSize:"14px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 16px rgba(0,150,199,0.35)", flexShrink:0, transition:"all 0.25s", animation: isPlaying ? "glow 2s ease-in-out infinite" : "none" }}>
-                    {isPlaying ? "⏸" : "▶"}
+                    style={{ background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"99px", color:"#fff", width:"40px", height:"40px", fontSize:"14px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 16px rgba(0,150,199,0.35)", flexShrink:0, transition:"all 0.25s", animation:isPlaying?"glow 2s ease-in-out infinite":"none" }}>
+                    {isPlaying?"⏸":"▶"}
                   </button>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:"8px", letterSpacing:"2px", color: isPlaying ? "#0096c7" : "#90a8b8", marginBottom:"6px", fontWeight:"700", transition:"color 0.3s" }}>
-                      {isPlaying ? "NOW PLAYING" : "PAUSED"}
-                    </div>
+                    <div style={{ fontSize:"8px", letterSpacing:"2px", color:isPlaying?"#0096c7":"#90a8b8", marginBottom:"6px", fontWeight:"700" }}>{isPlaying?"NOW PLAYING":"PAUSED"}</div>
                     <div style={{ height:"4px", background:"rgba(0,150,199,0.1)", borderRadius:"99px", overflow:"hidden" }}>
-                      <div style={{ width: isPlaying ? "100%" : "0%", height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", transition: isPlaying ? "width 30s linear" : "width 0.3s" }} />
+                      <div style={{ width:isPlaying?"100%":"0%", height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", transition:isPlaying?"width 30s linear":"width 0.3s" }} />
                     </div>
                   </div>
                 </div>
-
                 <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
                   <span style={{ fontSize:"9px", color:"#90a8b8", fontWeight:"700" }}>VOL</span>
                   <input type="range" min="0" max="1" step="0.01" value={volume}
-                    onChange={e => { setVolume(parseFloat(e.target.value)); if(audioRef.current) audioRef.current.volume = parseFloat(e.target.value); }}
-                    style={{ flex:1, accentColor:"#0096c7", cursor:"pointer", height:"3px" }} />
+                    onChange={e=>{ setVolume(parseFloat(e.target.value)); if(audioRef.current) audioRef.current.volume=parseFloat(e.target.value); }}
+                    style={{ flex:1, accentColor:"#0096c7", cursor:"pointer" }} />
                   <span style={{ fontSize:"9px", color:"#0096c7", fontWeight:"900", minWidth:"28px" }}>{Math.round(volume*100)}%</span>
                 </div>
               </div>
@@ -305,7 +304,7 @@ export default function App() {
           </aside>
         )}
 
-        {/* ── Main ── */}
+        {/* Main */}
         <main style={{ flex:1, overflowX:"hidden" }}>
 
           {/* Hero */}
@@ -315,18 +314,18 @@ export default function App() {
             </video>
             <div style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", background:"linear-gradient(180deg,rgba(3,4,94,0.4) 0%,rgba(0,150,199,0.2) 100%)", zIndex:1 }} />
             <div style={{ position:"relative", zIndex:2, animation:"float 5s ease-in-out infinite" }}>
-              <p style={{ fontSize:"11px", letterSpacing:"8px", color:"#90e0ef", margin:"0 0 20px", textShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>YOUR JOURNEY</p>
-              <h1 style={{ fontSize:"clamp(40px,7vw,96px)", fontWeight:"900", letterSpacing:"8px", margin:0, color:"#fff", textShadow:"0 4px 32px rgba(0,0,0,0.3)" }}>APPLICATIONS</h1>
+              <p style={{ fontSize:"11px", letterSpacing:"8px", color:"#90e0ef", margin:"0 0 20px" }}>YOUR JOURNEY</p>
+              <h1 style={{ fontSize:"clamp(40px,7vw,96px)", fontWeight:"900", letterSpacing:"8px", margin:0, color:"#fff" }}>APPLICATIONS</h1>
               <p style={{ fontSize:"13px", color:"#caf0f8", letterSpacing:"5px", marginTop:"14px", fontWeight:"300" }}>TRACK YOUR CAREER</p>
               <div style={{ width:"60px", height:"2px", background:"linear-gradient(90deg,#48cae4,#fff)", margin:"22px auto 32px", borderRadius:"2px" }} />
               <div style={{ display:"flex", gap:"16px", justifyContent:"center", flexWrap:"wrap" }}>
                 {[
                   { label:"TOTAL",      value:jobs.length },
                   { label:"SUCCESS",    value:`${successRate}%` },
-                  { label:"INTERVIEWS", value:jobs.filter(j=>j.status==="Interview").length },
+                  { label:"THIS WEEK",  value:upcomingInterviews },
                 ].map((s,i) => (
-                  <div key={s.label} className="glass-dark" style={{ borderRadius:"16px", padding:"16px 28px", color:"#fff", animation:`fadeUp 0.6s ease ${i*0.1}s both` }}>
-                    <div style={{ fontSize:"32px", fontWeight:"900", lineHeight:1 }}>{typeof s.value==="number" ? <AnimatedNumber value={s.value} /> : s.value}</div>
+                  <div key={s.label} style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"16px", padding:"16px 28px", color:"#fff", animation:`fadeUp 0.6s ease ${i*0.1}s both` }}>
+                    <div style={{ fontSize:"32px", fontWeight:"900", lineHeight:1 }}>{typeof s.value==="number"?<AnimatedNumber value={s.value}/>:s.value}</div>
                     <div style={{ fontSize:"8px", letterSpacing:"3px", color:"#90e0ef", marginTop:"6px" }}>{s.label}</div>
                   </div>
                 ))}
@@ -335,23 +334,22 @@ export default function App() {
           </section>
 
           {/* Add Job */}
-          <section ref={addRef} style={{ maxWidth:"820px", margin:"60px auto", padding:"0 40px" }}>
+          <section ref={addRef} style={{ maxWidth:"880px", margin:"60px auto", padding:"0 40px" }}>
             <div className="glass" style={{ borderRadius:"24px", padding:"40px 44px" }}>
               <p style={{ fontSize:"9px", letterSpacing:"6px", color:"#0096c7", textAlign:"center", margin:"0 0 28px", fontWeight:"700" }}>NEW APPLICATION</p>
               <div style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
-                {[
-                  { ph:"Company", val:company, set:setCompany },
-                  { ph:"Role",    val:role,    set:setRole    },
-                ].map(({ph,val,set}) => (
-                  <input key={ph} placeholder={ph} value={val} onChange={e=>set(e.target.value)}
-                    style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none", backdropFilter:"blur(8px)", boxShadow:"inset 0 2px 4px rgba(0,150,199,0.06)", transition:"all 0.2s" }} />
-                ))}
+                <input placeholder="Company" value={company} onChange={e=>setCompany(e.target.value)}
+                  style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none" }} />
+                <input placeholder="Role" value={role} onChange={e=>setRole(e.target.value)}
+                  style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none" }} />
                 <select value={status} onChange={e=>setStatus(e.target.value)}
-                  style={{ flex:1, minWidth:"130px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none", cursor:"pointer", backdropFilter:"blur(8px)" }}>
+                  style={{ flex:1, minWidth:"130px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none", cursor:"pointer" }}>
                   <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
                 </select>
+                <input type="date" value={interviewDate} onChange={e=>setInterviewDate(e.target.value)}
+                  style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none", cursor:"pointer" }} />
                 <button className="add-btn" onClick={addJob}
-                  style={{ padding:"13px 32px", background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"12px", color:"#fff", fontSize:"11px", fontWeight:"800", letterSpacing:"3px", cursor:"pointer", boxShadow:"0 4px 20px rgba(0,150,199,0.3)", transition:"all 0.25s" }}>
+                  style={{ padding:"13px 32px", background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"12px", color:"#fff", fontSize:"11px", fontWeight:"800", letterSpacing:"3px", cursor:"pointer", boxShadow:"0 4px 16px rgba(0,150,199,0.25)", transition:"all 0.25s" }}>
                   ADD
                 </button>
               </div>
@@ -359,14 +357,14 @@ export default function App() {
           </section>
 
           {/* Jobs */}
-          <section ref={jobsRef} style={{ maxWidth:"960px", margin:"0 auto", padding:"0 40px 100px" }}>
+          <section ref={jobsRef} style={{ maxWidth:"1000px", margin:"0 auto", padding:"0 40px 100px" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"24px", flexWrap:"wrap", gap:"12px" }}>
               <p style={{ fontSize:"9px", letterSpacing:"5px", color:"#0096c7", margin:0, fontWeight:"700" }}>
                 {displayed.length} {filter==="All"?"APPLICATIONS":filter.toUpperCase()}{search?` · "${search}"`:""}
               </p>
               {filter!=="All" && (
                 <button onClick={()=>setFilter("All")}
-                  style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(0,150,199,0.25)", borderRadius:"99px", color:"#0096c7", padding:"5px 16px", fontSize:"9px", letterSpacing:"2px", cursor:"pointer", backdropFilter:"blur(8px)", fontWeight:"700" }}>
+                  style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(0,150,199,0.25)", borderRadius:"99px", color:"#0096c7", padding:"5px 16px", fontSize:"9px", letterSpacing:"2px", cursor:"pointer", fontWeight:"700" }}>
                   CLEAR FILTER
                 </button>
               )}
@@ -375,23 +373,33 @@ export default function App() {
             <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
               {displayed.map((job,idx) => (
                 <div className="job-card" key={job.id}
-                  style={{ background: flash===job.id ? "rgba(0,150,199,0.08)" : "rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", border:`1px solid ${flash===job.id?"rgba(0,150,199,0.4)":"rgba(255,255,255,0.6)"}`, borderLeft:`4px solid ${STATUS[job.status]?.color}`, borderRadius:"18px", padding:"22px 28px", boxShadow:`0 4px 24px ${STATUS[job.status]?.glow}, inset 0 1px 0 rgba(255,255,255,0.7)`, transition:"all 0.3s cubic-bezier(.4,0,.2,1)", animation:`fadeUp 0.4s ease ${idx*0.04}s both` }}>
+                  style={{ background:flash===job.id?"rgba(0,150,199,0.08)":"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", border:`1px solid ${flash===job.id?"rgba(0,150,199,0.4)":"rgba(255,255,255,0.6)"}`, borderLeft:`4px solid ${STATUS[job.status]?.color}`, borderRadius:"18px", padding:"22px 28px", boxShadow:`0 4px 24px ${STATUS[job.status]?.glow},inset 0 1px 0 rgba(255,255,255,0.7)`, transition:"all 0.3s cubic-bezier(.4,0,.2,1)", animation:`fadeUp 0.4s ease ${idx*0.04}s both`, ...(isUrgent(job.interview_date)?{animation:"urgentPulse 2s ease-in-out infinite"}:{}) }}>
+
                   <div style={{ display:"flex", alignItems:"center", gap:"14px", flexWrap:"wrap", marginBottom:"16px" }}>
                     <span style={{ fontSize:"10px", color:"rgba(0,150,199,0.5)", minWidth:"28px", fontWeight:"700" }}>#{job.id}</span>
                     <span style={{ flex:2, fontSize:"14px", fontWeight:"800", letterSpacing:"2px", color:"#03045e" }}>{job.company.toUpperCase()}</span>
                     <span style={{ flex:2, fontSize:"12px", color:"#0096c7", fontWeight:"500" }}>{job.role}</span>
-                    <span style={{ padding:"5px 14px", borderRadius:"99px", fontSize:"9px", fontWeight:"800", letterSpacing:"2px", background:STATUS[job.status]?.bg, color:STATUS[job.status]?.color, border:`1px solid ${STATUS[job.status]?.border}`, backdropFilter:"blur(8px)" }}>
+                    {job.interview_date && (
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"rgba(255,255,255,0.5)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"99px", padding:"4px 12px" }}>
+                        <span style={{ fontSize:"9px", color:"#4a7a99", letterSpacing:"1px" }}>
+                          {new Date(job.interview_date).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}
+                        </span>
+                        <DaysUntil date={job.interview_date} />
+                      </div>
+                    )}
+                    <span style={{ padding:"5px 14px", borderRadius:"99px", fontSize:"9px", fontWeight:"800", letterSpacing:"2px", background:STATUS[job.status]?.bg, color:STATUS[job.status]?.color, border:`1px solid ${STATUS[job.status]?.border}` }}>
                       {job.status.toUpperCase()}
                     </span>
                     <select value={job.status} onChange={e=>updateStatus(job,e.target.value)}
-                      style={{ background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"10px", color:"#03045e", padding:"7px 10px", fontSize:"11px", outline:"none", cursor:"pointer", backdropFilter:"blur(8px)" }}>
+                      style={{ background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"10px", color:"#03045e", padding:"7px 10px", fontSize:"11px", outline:"none", cursor:"pointer" }}>
                       <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
                     </select>
                     <button className="del-btn" onClick={()=>deleteJob(job.id)}
-                      style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(231,111,81,0.25)", borderRadius:"10px", color:"#e76f51", padding:"7px 14px", fontSize:"10px", cursor:"pointer", transition:"all 0.2s", backdropFilter:"blur(8px)", fontWeight:"700" }}>
+                      style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(231,111,81,0.25)", borderRadius:"10px", color:"#e76f51", padding:"7px 14px", fontSize:"10px", cursor:"pointer", transition:"all 0.2s", fontWeight:"700" }}>
                       REMOVE
                     </button>
                   </div>
+
                   <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
                     <span style={{ fontSize:"8px", letterSpacing:"2px", color:"rgba(0,150,199,0.6)", minWidth:"56px", fontWeight:"700" }}>PROGRESS</span>
                     <div style={{ flex:1 }}><ProgressBar status={job.status} /></div>
@@ -399,6 +407,7 @@ export default function App() {
                       {job.status==="Rejected"?"CLOSED":job.status==="Offer"?"COMPLETE":"IN PROGRESS"}
                     </span>
                   </div>
+
                 </div>
               ))}
               {displayed.length===0 && (
