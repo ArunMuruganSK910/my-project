@@ -35,8 +35,62 @@ function DaysUntil({ date }) {
   const diff = Math.ceil((interview - today) / (1000 * 60 * 60 * 24));
   if (diff < 0) return <span style={{ fontSize:"9px", color:"#e76f51", letterSpacing:"2px", fontWeight:"700" }}>PASSED</span>;
   if (diff === 0) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700" }}>TODAY!</span>;
-  if (diff <= 3) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700", animation:"pulse 1s infinite" }}>{diff}D LEFT</span>;
+  if (diff <= 3) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700" }}>{diff}D LEFT</span>;
   return <span style={{ fontSize:"9px", color:"#2a9d8f", letterSpacing:"2px", fontWeight:"700" }}>{diff} DAYS</span>;
+}
+
+function EditModal({ job, onSave, onClose }) {
+  const [company, setCompany]   = useState(job.company);
+  const [role, setRole]         = useState(job.role);
+  const [status, setStatus]     = useState(job.status);
+  const [date, setDate]         = useState(job.interview_date || "");
+
+  const inputStyle = {
+    width:"100%", background:"rgba(255,255,255,0.7)", border:"1px solid rgba(255,255,255,0.9)",
+    borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none",
+    boxSizing:"border-box", marginBottom:"12px",
+  };
+
+  return (
+    <div style={{ position:"fixed", top:0, left:0, width:"100%", height:"100%", background:"rgba(3,4,94,0.4)", backdropFilter:"blur(8px)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", animation:"fadeUp 0.2s ease" }}>
+      <div style={{ background:"rgba(255,255,255,0.35)", backdropFilter:"blur(32px)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"24px", padding:"40px", width:"460px", boxShadow:"0 20px 60px rgba(0,150,199,0.2), inset 0 1px 0 rgba(255,255,255,0.8)" }}>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"28px" }}>
+          <p style={{ fontSize:"9px", letterSpacing:"6px", color:"#0096c7", margin:0, fontWeight:"700" }}>EDIT APPLICATION</p>
+          <button onClick={onClose}
+            style={{ background:"transparent", border:"1px solid rgba(0,150,199,0.2)", borderRadius:"8px", color:"#0096c7", width:"32px", height:"32px", cursor:"pointer", fontSize:"14px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            ✕
+          </button>
+        </div>
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>COMPANY</label>
+        <input value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company" style={inputStyle} />
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>ROLE</label>
+        <input value={role} onChange={e=>setRole(e.target.value)} placeholder="Role" style={inputStyle} />
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>STATUS</label>
+        <select value={status} onChange={e=>setStatus(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+          <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
+        </select>
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>INTERVIEW DATE</label>
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle} />
+
+        <div style={{ display:"flex", gap:"12px", marginTop:"8px" }}>
+          <button onClick={onClose}
+            style={{ flex:1, padding:"13px", background:"rgba(255,255,255,0.4)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"12px", color:"#4a7a99", fontSize:"10px", letterSpacing:"3px", fontWeight:"700", cursor:"pointer", transition:"all 0.2s" }}>
+            CANCEL
+          </button>
+          <button onClick={()=>onSave({ company, role, status, interview_date: date || null })}
+            style={{ flex:2, padding:"13px", background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"12px", color:"#fff", fontSize:"10px", letterSpacing:"3px", fontWeight:"800", cursor:"pointer", boxShadow:"0 4px 16px rgba(0,150,199,0.3)", transition:"all 0.2s" }}>
+            SAVE CHANGES
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
 }
 
 const STATUS = {
@@ -63,6 +117,7 @@ export default function App() {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [isPlaying, setIsPlaying]     = useState(false);
   const [volume, setVolume]           = useState(0.5);
+  const [editingJob, setEditingJob]   = useState(null);
   const audioRef = useRef(null);
   const jobsRef  = useRef(null);
   const addRef   = useRef(null);
@@ -101,6 +156,15 @@ export default function App() {
       method:"PUT", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ company:job.company, role:job.role, status:s, interview_date:job.interview_date }),
     });
+    fetchJobs();
+  };
+
+  const saveEdit = async (updated) => {
+    await fetch(`${API}/jobs/${editingJob.id}`, {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(updated),
+    });
+    setEditingJob(null);
     fetchJobs();
   };
 
@@ -166,38 +230,21 @@ export default function App() {
         .lb2 { animation:bars 0.8s ease-in-out 0.15s infinite; }
         .lb3 { animation:bars 0.8s ease-in-out 0.3s infinite; }
       `}</style>
-
       <div style={{ animation:"float 3s ease-in-out infinite", textAlign:"center" }}>
-        {/* Logo */}
-        <div style={{ fontSize:"11px", letterSpacing:"8px", color:"#0096c7", marginBottom:"32px", fontWeight:"900", animation:"fadeUp 0.6s ease both" }}>
-          CAREER TRACKER
-        </div>
-
-        {/* Wave bars */}
+        <div style={{ fontSize:"11px", letterSpacing:"8px", color:"#0096c7", marginBottom:"32px", fontWeight:"900", animation:"fadeUp 0.6s ease both" }}>CAREER TRACKER</div>
         <div style={{ display:"flex", alignItems:"flex-end", gap:"5px", height:"36px", justifyContent:"center", marginBottom:"40px" }}>
           {[1,2,3,4,5,6,7,8,9].map(i => (
-            <div key={i} className={`lb${(i%3)+1}`}
-              style={{ width:"5px", background:`linear-gradient(180deg,#48cae4,#0096c7)`, borderRadius:"3px", minHeight:"4px", opacity: 0.5 + (i%3)*0.2 }} />
+            <div key={i} className={`lb${(i%3)+1}`} style={{ width:"5px", background:"linear-gradient(180deg,#48cae4,#0096c7)", borderRadius:"3px", minHeight:"4px", opacity:0.5+(i%3)*0.2 }} />
           ))}
         </div>
-
-        {/* Glass card */}
         <div style={{ background:"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"24px", padding:"40px 60px", boxShadow:"0 8px 32px rgba(0,150,199,0.15)", animation:"fadeUp 0.6s ease 0.2s both" }}>
-          <div style={{ fontSize:"32px", marginBottom:"16px" }}>🌊</div>
-          <div style={{ fontSize:"13px", letterSpacing:"4px", color:"#03045e", fontWeight:"700", marginBottom:"8px" }}>
-            WAKING UP
-          </div>
-          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", animation:"pulse 1.5s infinite" }}>
-            LOADING YOUR APPLICATIONS...
-          </div>
+          <div style={{ fontSize:"13px", letterSpacing:"4px", color:"#03045e", fontWeight:"700", marginBottom:"8px" }}>WAKING UP</div>
+          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", animation:"pulse 1.5s infinite" }}>LOADING YOUR APPLICATIONS...</div>
           <div style={{ marginTop:"24px", height:"3px", width:"200px", background:"rgba(0,150,199,0.1)", borderRadius:"99px", overflow:"hidden" }}>
-            <div style={{ height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", animation:"loading 2s ease-in-out infinite", width:"60%" }} />
+            <div style={{ height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", width:"60%", animation:"pulse 1.5s infinite" }} />
           </div>
         </div>
-
-        <div style={{ marginTop:"24px", fontSize:"9px", letterSpacing:"3px", color:"#90a8b8", animation:"fadeUp 0.6s ease 0.4s both" }}>
-          FREE TIER — FIRST LOAD MAY TAKE ~30s
-        </div>
+        <div style={{ marginTop:"24px", fontSize:"9px", letterSpacing:"3px", color:"#90a8b8", animation:"fadeUp 0.6s ease 0.4s both" }}>FREE TIER — FIRST LOAD MAY TAKE ~30s</div>
       </div>
     </div>
   );
@@ -218,11 +265,12 @@ export default function App() {
         .job-card:hover  { transform:translateY(-4px) scale(1.005)!important; }
         .stat-pill:hover { transform:translateX(4px) scale(1.02)!important; }
         .del-btn:hover   { background:rgba(231,111,81,0.15)!important; border-color:#e76f51!important; color:#e76f51!important; }
+        .edit-btn:hover  { background:rgba(0,150,199,0.15)!important; border-color:#0096c7!important; color:#0096c7!important; }
         .add-btn:hover   { transform:translateY(-2px) scale(1.03)!important; box-shadow:0 12px 40px rgba(0,150,199,0.5)!important; }
         .play-btn:hover  { transform:scale(1.1)!important; }
         .filter-chip:hover { transform:translateX(4px)!important; }
         input::placeholder { color:rgba(3,4,94,0.3); }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: opacity(0.5); cursor:pointer; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter:opacity(0.5); cursor:pointer; }
         select option { background:#e8f4f8; color:#03045e; }
         ::-webkit-scrollbar { width:3px; }
         ::-webkit-scrollbar-thumb { background:rgba(0,150,199,0.3); border-radius:99px; }
@@ -230,6 +278,9 @@ export default function App() {
         .bar2 { animation:bars 0.8s ease-in-out 0.15s infinite; }
         .bar3 { animation:bars 0.8s ease-in-out 0.3s infinite; }
       `}</style>
+
+      {/* Edit Modal */}
+      {editingJob && <EditModal job={editingJob} onSave={saveEdit} onClose={()=>setEditingJob(null)} />}
 
       {/* Topbar */}
       <nav className="glass" style={{ position:"sticky", top:0, zIndex:99, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -261,55 +312,50 @@ export default function App() {
         {sidebarOpen && (
           <aside style={{ width:"260px", background:"rgba(255,255,255,0.2)", backdropFilter:"blur(32px)", WebkitBackdropFilter:"blur(32px)", borderRight:"1px solid rgba(255,255,255,0.4)", display:"flex", flexDirection:"column", position:"sticky", top:"57px", height:"calc(100vh - 57px)", overflowY:"auto", animation:"slideIn 0.35s cubic-bezier(.4,0,.2,1)", boxShadow:"4px 0 32px rgba(0,150,199,0.08)" }}>
 
-            {/* Nav */}
             <div style={{ padding:"28px 16px 20px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 8px", fontWeight:"700" }}>NAVIGATE</p>
               {navItems.map((item,i) => (
                 <button key={item.id} className="nav-item"
                   onClick={()=>item.ref ? scrollTo(item.ref,item.id) : setActiveSection("dashboard")}
-                  style={{ width:"100%", background:activeSection===item.id?"rgba(0,150,199,0.12)":"transparent", border:"none", borderRadius:"12px", color:activeSection===item.id?"#0096c7":"#4a7a99", padding:"12px 16px", fontSize:"10px", fontWeight:activeSection===item.id?"800":"400", letterSpacing:"3px", cursor:"pointer", textAlign:"left", marginBottom:"4px", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", borderLeft:activeSection===item.id?"3px solid #0096c7":"3px solid transparent", animation:`fadeUp 0.4s ease ${i*0.08}s both` }}>
+                  style={{ width:"100%", background:activeSection===item.id?"rgba(0,150,199,0.12)":"transparent", border:"none", borderRadius:"12px", color:activeSection===item.id?"#0096c7":"#4a7a99", padding:"12px 16px", fontSize:"10px", fontWeight:activeSection===item.id?"800":"400", letterSpacing:"3px", cursor:"pointer", textAlign:"left", marginBottom:"4px", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", borderLeft:activeSection===item.id?"3px solid #0096c7":"3px solid transparent" }}>
                   {item.label}
                 </button>
               ))}
             </div>
 
-            {/* Search */}
             <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 4px", fontWeight:"700" }}>SEARCH</p>
               <input placeholder="Company or role..." value={search} onChange={e=>setSearch(e.target.value)}
                 style={{ width:"100%", background:"rgba(255,255,255,0.5)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"12px", color:"#03045e", padding:"10px 14px", fontSize:"12px", outline:"none", boxSizing:"border-box" }} />
             </div>
 
-            {/* Quick Stats */}
             <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>QUICK STATS</p>
               {stats.map((s,i) => (
                 <div key={s.label} className="stat-pill"
                   onClick={()=>{ setFilter(s.key); scrollTo(jobsRef,"applications"); }}
-                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", borderRadius:"12px", marginBottom:"5px", background:filter===s.key?"rgba(0,150,199,0.12)":"rgba(255,255,255,0.3)", border:filter===s.key?"1px solid rgba(0,150,199,0.3)":"1px solid rgba(255,255,255,0.5)", cursor:"pointer", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", animation:`fadeUp 0.4s ease ${i*0.06}s both` }}>
+                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", borderRadius:"12px", marginBottom:"5px", background:filter===s.key?"rgba(0,150,199,0.12)":"rgba(255,255,255,0.3)", border:filter===s.key?"1px solid rgba(0,150,199,0.3)":"1px solid rgba(255,255,255,0.5)", cursor:"pointer", transition:"all 0.25s cubic-bezier(.4,0,.2,1)" }}>
                   <span style={{ fontSize:"9px", letterSpacing:"2px", color:i===0?"#0096c7":"#4a7a99", fontWeight:i===0?"700":"400" }}>{s.label}</span>
                   <span style={{ fontSize:"22px", fontWeight:"900", color:i===0?"#0096c7":"#03045e" }}><AnimatedNumber value={s.value} /></span>
                 </div>
               ))}
             </div>
 
-            {/* Filter */}
             <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>FILTER</p>
               {FILTERS.map((f,i) => (
                 <button key={f} className="filter-chip"
                   onClick={()=>{ setFilter(f); scrollTo(jobsRef,"applications"); }}
-                  style={{ width:"100%", background:filter===f?(f==="All"?"rgba(0,150,199,0.12)":STATUS[f]?.bg):"rgba(255,255,255,0.25)", border:filter===f?`1px solid ${f==="All"?"rgba(0,150,199,0.4)":STATUS[f]?.border}`:"1px solid rgba(255,255,255,0.5)", borderRadius:"12px", color:filter===f?(f==="All"?"#0096c7":STATUS[f]?.color):"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:filter===f?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"5px", transition:"all 0.25s", display:"flex", justifyContent:"space-between", alignItems:"center", animation:`fadeUp 0.4s ease ${i*0.05}s both` }}>
+                  style={{ width:"100%", background:filter===f?(f==="All"?"rgba(0,150,199,0.12)":STATUS[f]?.bg):"rgba(255,255,255,0.25)", border:filter===f?`1px solid ${f==="All"?"rgba(0,150,199,0.4)":STATUS[f]?.border}`:"1px solid rgba(255,255,255,0.5)", borderRadius:"12px", color:filter===f?(f==="All"?"#0096c7":STATUS[f]?.color):"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:filter===f?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"5px", transition:"all 0.25s", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span>{f.toUpperCase()}</span>
                   <span style={{ fontWeight:"900", fontSize:"14px" }}>{f==="All"?jobs.length:jobs.filter(j=>j.status===f).length}</span>
                 </button>
               ))}
             </div>
 
-            {/* Sort */}
             <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 4px", fontWeight:"700" }}>SORT BY</p>
-              {[["newest","NEWEST FIRST"],["company","COMPANY A-Z"],["status","BY STATUS"],["date","BY DATE"]].map(([val,label],i) => (
+              {[["newest","NEWEST FIRST"],["company","COMPANY A-Z"],["status","BY STATUS"],["date","BY DATE"]].map(([val,label]) => (
                 <button key={val} onClick={()=>setSortBy(val)}
                   style={{ width:"100%", background:sortBy===val?"rgba(0,150,199,0.1)":"transparent", border:"none", borderRadius:"12px", color:sortBy===val?"#0096c7":"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:sortBy===val?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"3px", transition:"all 0.25s", borderLeft:sortBy===val?"3px solid #0096c7":"3px solid transparent" }}>
                   {label}
@@ -317,11 +363,10 @@ export default function App() {
               ))}
             </div>
 
-            {/* Music */}
             <div style={{ padding:"20px 16px" }}>
               <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>AMBIENT</p>
               <audio ref={audioRef} loop><source src={music} type="audio/mpeg" /></audio>
-              <div style={{ background:"rgba(255,255,255,0.35)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"16px", padding:"16px", backdropFilter:"blur(16px)", boxShadow:"0 4px 20px rgba(0,150,199,0.1),inset 0 1px 0 rgba(255,255,255,0.8)" }}>
+              <div style={{ background:"rgba(255,255,255,0.35)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"16px", padding:"16px", backdropFilter:"blur(16px)" }}>
                 <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", marginBottom:"14px", fontWeight:"800" }}>DREAMY WAVES</div>
                 <div style={{ display:"flex", alignItems:"flex-end", gap:"3px", height:"24px", marginBottom:"14px", justifyContent:"center" }}>
                   {isPlaying
@@ -354,7 +399,6 @@ export default function App() {
           </aside>
         )}
 
-        {/* Main */}
         <main style={{ flex:1, overflowX:"hidden" }}>
 
           {/* Hero */}
@@ -370,9 +414,9 @@ export default function App() {
               <div style={{ width:"60px", height:"2px", background:"linear-gradient(90deg,#48cae4,#fff)", margin:"22px auto 32px", borderRadius:"2px" }} />
               <div style={{ display:"flex", gap:"16px", justifyContent:"center", flexWrap:"wrap" }}>
                 {[
-                  { label:"TOTAL",      value:jobs.length },
-                  { label:"SUCCESS",    value:`${successRate}%` },
-                  { label:"THIS WEEK",  value:upcomingInterviews },
+                  { label:"TOTAL",     value:jobs.length },
+                  { label:"SUCCESS",   value:`${successRate}%` },
+                  { label:"THIS WEEK", value:upcomingInterviews },
                 ].map((s,i) => (
                   <div key={s.label} style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"16px", padding:"16px 28px", color:"#fff", animation:`fadeUp 0.6s ease ${i*0.1}s both` }}>
                     <div style={{ fontSize:"32px", fontWeight:"900", lineHeight:1 }}>{typeof s.value==="number"?<AnimatedNumber value={s.value}/>:s.value}</div>
@@ -423,10 +467,10 @@ export default function App() {
             <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
               {displayed.map((job,idx) => (
                 <div className="job-card" key={job.id}
-                  style={{ background:flash===job.id?"rgba(0,150,199,0.08)":"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", border:`1px solid ${flash===job.id?"rgba(0,150,199,0.4)":"rgba(255,255,255,0.6)"}`, borderLeft:`4px solid ${STATUS[job.status]?.color}`, borderRadius:"18px", padding:"22px 28px", boxShadow:`0 4px 24px ${STATUS[job.status]?.glow},inset 0 1px 0 rgba(255,255,255,0.7)`, transition:"all 0.3s cubic-bezier(.4,0,.2,1)", animation:`fadeUp 0.4s ease ${idx*0.04}s both`, ...(isUrgent(job.interview_date)?{animation:"urgentPulse 2s ease-in-out infinite"}:{}) }}>
+                  style={{ background:flash===job.id?"rgba(0,150,199,0.08)":"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", border:`1px solid ${flash===job.id?"rgba(0,150,199,0.4)":"rgba(255,255,255,0.6)"}`, borderLeft:`4px solid ${STATUS[job.status]?.color}`, borderRadius:"18px", padding:"22px 28px", boxShadow:`0 4px 24px ${STATUS[job.status]?.glow},inset 0 1px 0 rgba(255,255,255,0.7)`, transition:"all 0.3s cubic-bezier(.4,0,.2,1)", animation:isUrgent(job.interview_date)?"urgentPulse 2s ease-in-out infinite":`fadeUp 0.4s ease ${idx*0.04}s both` }}>
 
                   <div style={{ display:"flex", alignItems:"center", gap:"14px", flexWrap:"wrap", marginBottom:"16px" }}>
-                    <span style={{ fontSize:"10px", color:"rgba(0,150,199,0.5)", minWidth:"28px", fontWeight:"700" }}>#{idx + 1}</span>
+                    <span style={{ fontSize:"10px", color:"rgba(0,150,199,0.5)", minWidth:"28px", fontWeight:"700" }}>#{idx+1}</span>
                     <span style={{ flex:2, fontSize:"14px", fontWeight:"800", letterSpacing:"2px", color:"#03045e" }}>{job.company.toUpperCase()}</span>
                     <span style={{ flex:2, fontSize:"12px", color:"#0096c7", fontWeight:"500" }}>{job.role}</span>
                     {job.interview_date && (
@@ -444,6 +488,10 @@ export default function App() {
                       style={{ background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"10px", color:"#03045e", padding:"7px 10px", fontSize:"11px", outline:"none", cursor:"pointer" }}>
                       <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
                     </select>
+                    <button className="edit-btn" onClick={()=>setEditingJob(job)}
+                      style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(0,150,199,0.2)", borderRadius:"10px", color:"#0096c7", padding:"7px 14px", fontSize:"10px", cursor:"pointer", transition:"all 0.2s", fontWeight:"700" }}>
+                      EDIT
+                    </button>
                     <button className="del-btn" onClick={()=>deleteJob(job.id)}
                       style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(231,111,81,0.25)", borderRadius:"10px", color:"#e76f51", padding:"7px 14px", fontSize:"10px", cursor:"pointer", transition:"all 0.2s", fontWeight:"700" }}>
                       REMOVE
@@ -468,7 +516,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* Footer */}
           <footer className="glass" style={{ padding:"24px 40px", display:"flex", justifyContent:"space-between", borderTop:"1px solid rgba(255,255,255,0.4)", borderRadius:0 }}>
             <span style={{ fontSize:"11px", letterSpacing:"5px", color:"#03045e", fontWeight:"900" }}>CAREER TRACKER</span>
             <span style={{ fontSize:"10px", letterSpacing:"4px", color:"#0096c7", fontWeight:"700" }}>RIDE THE WAVE 2025</span>
