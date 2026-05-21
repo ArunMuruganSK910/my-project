@@ -122,7 +122,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
+        "http://localhost:3001",
         "https://jobtracker-frontend-j1u4.onrender.com"
     ],
     allow_methods=["*"],

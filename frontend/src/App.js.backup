@@ -1,0 +1,557 @@
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence, useInView, useScroll, useTransform } from "framer-motion";
+import video from "./video.mp4";
+import music from "./music.mp3";
+
+const API = "https://jobtracker-backend-qg6u.onrender.com";
+
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (value === 0) { setDisplay(0); return; }
+    let start = 0;
+    const timer = setInterval(() => {
+      start += 1; setDisplay(start);
+      if (start === value) clearInterval(timer);
+    }, 50);
+    return () => clearInterval(timer);
+  }, [value]);
+  return <span>{display}</span>;
+}
+
+function ProgressBar({ status }) {
+  const percent = { Applied: 25, Interview: 60, Offer: 100, Rejected: 100 }[status];
+  const color = status === "Rejected" ? "#e76f51" : status === "Offer" ? "#2a9d8f" : "linear-gradient(90deg,#48cae4,#0096c7)";
+  return (
+    <div style={{ width:"100%", background:"rgba(255,255,255,0.15)", borderRadius:"99px", height:"6px", overflow:"hidden" }}>
+      <div style={{ width:`${percent}%`, height:"100%", background:color, borderRadius:"99px", transition:"width 1.2s cubic-bezier(.4,0,.2,1)" }} />
+    </div>
+  );
+}
+
+function DaysUntil({ date }) {
+  if (!date) return null;
+  const today = new Date();
+  const interview = new Date(date);
+  const diff = Math.ceil((interview - today) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return <span style={{ fontSize:"9px", color:"#e76f51", letterSpacing:"2px", fontWeight:"700" }}>PASSED</span>;
+  if (diff === 0) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700" }}>TODAY!</span>;
+  if (diff <= 3) return <span style={{ fontSize:"9px", color:"#f4a261", letterSpacing:"2px", fontWeight:"700" }}>{diff}D LEFT</span>;
+  return <span style={{ fontSize:"9px", color:"#2a9d8f", letterSpacing:"2px", fontWeight:"700" }}>{diff} DAYS</span>;
+}
+
+function EditModal({ job, onSave, onClose }) {
+  const [company, setCompany]   = useState(job.company);
+  const [role, setRole]         = useState(job.role);
+  const [status, setStatus]     = useState(job.status);
+  const [date, setDate]         = useState(job.interview_date || "");
+
+  const inputStyle = {
+    width:"100%", background:"rgba(255,255,255,0.7)", border:"1px solid rgba(255,255,255,0.9)",
+    borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none",
+    boxSizing:"border-box", marginBottom:"12px",
+  };
+
+  return (
+    <div style={{ position:"fixed", top:0, left:0, width:"100%", height:"100%", background:"rgba(3,4,94,0.4)", backdropFilter:"blur(8px)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", animation:"fadeUp 0.2s ease" }}>
+      <div style={{ background:"rgba(255,255,255,0.35)", backdropFilter:"blur(32px)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"24px", padding:"40px", width:"460px", boxShadow:"0 20px 60px rgba(0,150,199,0.2), inset 0 1px 0 rgba(255,255,255,0.8)" }}>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"28px" }}>
+          <p style={{ fontSize:"9px", letterSpacing:"6px", color:"#0096c7", margin:0, fontWeight:"700" }}>EDIT APPLICATION</p>
+          <button onClick={onClose}
+            style={{ background:"transparent", border:"1px solid rgba(0,150,199,0.2)", borderRadius:"8px", color:"#0096c7", width:"32px", height:"32px", cursor:"pointer", fontSize:"14px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            ✕
+          </button>
+        </div>
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>COMPANY</label>
+        <input value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company" style={inputStyle} />
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>ROLE</label>
+        <input value={role} onChange={e=>setRole(e.target.value)} placeholder="Role" style={inputStyle} />
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>STATUS</label>
+        <select value={status} onChange={e=>setStatus(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+          <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
+        </select>
+
+        <label style={{ fontSize:"8px", letterSpacing:"3px", color:"#5baed6", fontWeight:"700", display:"block", marginBottom:"6px" }}>INTERVIEW DATE</label>
+        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle} />
+
+        <div style={{ display:"flex", gap:"12px", marginTop:"8px" }}>
+          <button onClick={onClose}
+            style={{ flex:1, padding:"13px", background:"rgba(255,255,255,0.4)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"12px", color:"#4a7a99", fontSize:"10px", letterSpacing:"3px", fontWeight:"700", cursor:"pointer", transition:"all 0.2s" }}>
+            CANCEL
+          </button>
+          <button onClick={()=>onSave({ company, role, status, interview_date: date || null })}
+            style={{ flex:2, padding:"13px", background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"12px", color:"#fff", fontSize:"10px", letterSpacing:"3px", fontWeight:"800", cursor:"pointer", boxShadow:"0 4px 16px rgba(0,150,199,0.3)", transition:"all 0.2s" }}>
+            SAVE CHANGES
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+const STATUS = {
+  Applied:   { color:"#0096c7", bg:"rgba(0,150,199,0.15)",  border:"rgba(0,150,199,0.4)",  glow:"rgba(0,150,199,0.15)"  },
+  Interview: { color:"#f4a261", bg:"rgba(244,162,97,0.15)", border:"rgba(244,162,97,0.4)", glow:"rgba(244,162,97,0.15)" },
+  Offer:     { color:"#2a9d8f", bg:"rgba(42,157,143,0.15)", border:"rgba(42,157,143,0.4)", glow:"rgba(42,157,143,0.15)" },
+  Rejected:  { color:"#e76f51", bg:"rgba(231,111,81,0.15)", border:"rgba(231,111,81,0.4)", glow:"rgba(231,111,81,0.15)" },
+};
+
+const FILTERS = ["All", "Applied", "Interview", "Offer", "Rejected"];
+
+export default function App() {
+  const { scrollY } = useScroll();
+  const videoY = useTransform(scrollY, [0, 600], [0, 150]);
+  const heroTextY = useTransform(scrollY, [0, 600], [0, -80]);
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+
+  const [jobs, setJobs]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [company, setCompany]         = useState("");
+  const [role, setRole]               = useState("");
+  const [status, setStatus]           = useState("Applied");
+  const [interviewDate, setInterviewDate] = useState("");
+  const [flash, setFlash]             = useState(null);
+  const [filter, setFilter]           = useState("All");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [search, setSearch]           = useState("");
+  const [sortBy, setSortBy]           = useState("newest");
+  const [activeSection, setActiveSection] = useState("dashboard");
+  const [isPlaying, setIsPlaying]     = useState(false);
+  const [volume, setVolume]           = useState(0.5);
+  const [editingJob, setEditingJob]   = useState(null);
+  const audioRef = useRef(null);
+  const jobsRef  = useRef(null);
+  const addRef   = useRef(null);
+
+  useEffect(() => { fetchJobs(true); }, []);
+
+  const fetchJobs = async (initial = false) => {
+    if (initial) setLoading(true);
+    const r = await fetch(`${API}/jobs`);
+    const d = await r.json();
+    setJobs(d.jobs);
+    if (initial) setLoading(false);
+  };
+
+  const addJob = async () => {
+    if (!company || !role) return;
+    const r = await fetch(`${API}/jobs`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ company, role, status, interview_date: interviewDate || null }),
+    });
+    const d = await r.json();
+    setFlash(d.job.id);
+    setTimeout(() => setFlash(null), 1500);
+    setCompany(""); setRole(""); setStatus("Applied"); setInterviewDate("");
+    fetchJobs();
+    jobsRef.current?.scrollIntoView({ behavior:"smooth" });
+  };
+
+  const deleteJob = async (id) => {
+    await fetch(`${API}/jobs/${id}`, { method:"DELETE" });
+    fetchJobs();
+  };
+
+  const updateStatus = async (job, s) => {
+    await fetch(`${API}/jobs/${job.id}`, {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ company:job.company, role:job.role, status:s, interview_date:job.interview_date }),
+    });
+    fetchJobs();
+  };
+
+  const saveEdit = async (updated) => {
+    await fetch(`${API}/jobs/${editingJob.id}`, {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(updated),
+    });
+    setEditingJob(null);
+    fetchJobs();
+  };
+
+  const toggleMusic = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) { audioRef.current.pause(); }
+    else { audioRef.current.volume = volume; audioRef.current.play(); }
+    setIsPlaying(p => !p);
+  };
+
+  const stats = [
+    { label:"TOTAL",      value:jobs.length,                                       key:"All"       },
+    { label:"APPLIED",    value:jobs.filter(j=>j.status==="Applied").length,   key:"Applied"   },
+    { label:"INTERVIEWS", value:jobs.filter(j=>j.status==="Interview").length, key:"Interview" },
+    { label:"OFFERS",     value:jobs.filter(j=>j.status==="Offer").length,     key:"Offer"     },
+    { label:"REJECTED",   value:jobs.filter(j=>j.status==="Rejected").length,  key:"Rejected"  },
+  ];
+
+  const successRate = jobs.length > 0
+    ? Math.round((jobs.filter(j=>j.status==="Offer").length / jobs.length) * 100) : 0;
+
+  const upcomingInterviews = jobs.filter(j => {
+    if (!j.interview_date) return false;
+    const diff = Math.ceil((new Date(j.interview_date) - new Date()) / (1000*60*60*24));
+    return diff >= 0 && diff <= 7;
+  }).length;
+
+  let displayed = filter==="All" ? [...jobs] : jobs.filter(j=>j.status===filter);
+  if (search) displayed = displayed.filter(j =>
+    j.company.toLowerCase().includes(search.toLowerCase()) ||
+    j.role.toLowerCase().includes(search.toLowerCase())
+  );
+  if (sortBy==="newest")  displayed = displayed.reverse();
+  if (sortBy==="company") displayed = displayed.sort((a,b)=>a.company.localeCompare(b.company));
+  if (sortBy==="status")  displayed = displayed.sort((a,b)=>a.status.localeCompare(b.status));
+  if (sortBy==="date")    displayed = displayed.sort((a,b)=> a.interview_date ? -1 : 1);
+
+  const scrollTo = (ref, section) => {
+    ref?.current?.scrollIntoView({ behavior:"smooth" });
+    setActiveSection(section);
+  };
+
+  const navItems = [
+    { id:"dashboard",    label:"DASHBOARD",   ref:null    },
+    { id:"add",          label:"ADD NEW",      ref:addRef  },
+    { id:"applications", label:"APPLICATIONS", ref:jobsRef },
+  ];
+
+  const isUrgent = (date) => {
+    if (!date) return false;
+    const diff = Math.ceil((new Date(date) - new Date()) / (1000*60*60*24));
+    return diff >= 0 && diff <= 3;
+  };
+
+  if (loading) return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#c8e8f5 0%,#ddf0f8 50%,#c0e4f2 100%)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif" }}>
+      <style>{`
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes bars  { 0%,100%{height:8px} 50%{height:28px} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        .lb1 { animation:bars 0.8s ease-in-out infinite; }
+        .lb2 { animation:bars 0.8s ease-in-out 0.15s infinite; }
+        .lb3 { animation:bars 0.8s ease-in-out 0.3s infinite; }
+      `}</style>
+      <div style={{ animation:"float 3s ease-in-out infinite", textAlign:"center" }}>
+        <div style={{ fontSize:"11px", letterSpacing:"8px", color:"#0096c7", marginBottom:"32px", fontWeight:"900", animation:"fadeUp 0.6s ease both" }}>CAREER TRACKER</div>
+        <div style={{ display:"flex", alignItems:"flex-end", gap:"5px", height:"36px", justifyContent:"center", marginBottom:"40px" }}>
+          {[1,2,3,4,5,6,7,8,9].map(i => (
+            <div key={i} className={`lb${(i%3)+1}`} style={{ width:"5px", background:"linear-gradient(180deg,#48cae4,#0096c7)", borderRadius:"3px", minHeight:"4px", opacity:0.5+(i%3)*0.2 }} />
+          ))}
+        </div>
+        <div style={{ background:"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"24px", padding:"40px 60px", boxShadow:"0 8px 32px rgba(0,150,199,0.15)", animation:"fadeUp 0.6s ease 0.2s both" }}>
+          <div style={{ fontSize:"13px", letterSpacing:"4px", color:"#03045e", fontWeight:"700", marginBottom:"8px" }}>WAKING UP</div>
+          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", animation:"pulse 1.5s infinite" }}>LOADING YOUR APPLICATIONS...</div>
+          <div style={{ marginTop:"24px", height:"3px", width:"200px", background:"rgba(0,150,199,0.1)", borderRadius:"99px", overflow:"hidden" }}>
+            <div style={{ height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", width:"60%", animation:"pulse 1.5s infinite" }} />
+          </div>
+        </div>
+        <div style={{ marginTop:"24px", fontSize:"9px", letterSpacing:"3px", color:"#90a8b8", animation:"fadeUp 0.6s ease 0.4s both" }}>FREE TIER — FIRST LOAD MAY TAKE ~30s</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grain" style={{ minHeight:"100vh", background:"linear-gradient(135deg,#c8e8f5 0%,#ddf0f8 50%,#c0e4f2 100%)", color:"#03045e", fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif", display:"flex", flexDirection:"column" }}>
+
+      <style>{`
+        @keyframes fadeUp  { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes grain { 0%,100%{transform:translate(0,0)} 10%{transform:translate(-2%,-3%)} 20%{transform:translate(3%,2%)} 30%{transform:translate(-1%,4%)} 40%{transform:translate(2%,-1%)} 50%{transform:translate(-3%,3%)} 60%{transform:translate(4%,-2%)} 70%{transform:translate(-2%,1%)} 80%{transform:translate(3%,-3%)} 90%{transform:translate(-1%,2%)} }
+        .grain::after { content:""; position:fixed; top:-50%; left:-50%; width:200%; height:200%; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E"); animation:grain 0.5s steps(1) infinite; opacity:0.08; pointer-events:none; z-index:9999; }
+        @keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes slideIn { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes glow    { 0%,100%{box-shadow:0 0 20px rgba(0,150,199,0.3)} 50%{box-shadow:0 0 40px rgba(0,150,199,0.6)} }
+        @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes urgentPulse { 0%,100%{box-shadow:0 4px 24px rgba(244,162,97,0.2)} 50%{box-shadow:0 4px 40px rgba(244,162,97,0.5)} }
+        @keyframes bars    { 0%,100%{height:8px} 50%{height:20px} }
+        .glass { background:rgba(255,255,255,0.25)!important; backdrop-filter:blur(20px)!important; border:1px solid rgba(255,255,255,0.5)!important; box-shadow:0 8px 32px rgba(0,150,199,0.12),inset 0 1px 0 rgba(255,255,255,0.6)!important; }
+        .nav-item:hover  { background:rgba(0,150,199,0.12)!important; color:#0096c7!important; transform:translateX(4px)!important; }
+        .job-card:hover  { transform:translateY(-4px) scale(1.005)!important; }
+        .sketch-border { position:relative; }
+        .sketch-border::before { content:""; position:absolute; top:-2px; left:-2px; right:-2px; bottom:-2px; border-radius:20px; background:transparent; border:2px solid rgba(3,4,94,0.08); transform:rotate(-0.3deg); pointer-events:none; }
+        .sketch-border::after { content:""; position:absolute; top:-1px; left:-1px; right:-1px; bottom:-1px; border-radius:18px; background:transparent; border:1px solid rgba(3,4,94,0.05); transform:rotate(0.2deg); pointer-events:none; }
+        .sketch-border { }
+        .sketch-border { filter: url(#sketch); }
+        .stat-pill:hover { transform:translateX(4px) scale(1.02)!important; }
+        .del-btn:hover   { background:rgba(231,111,81,0.15)!important; border-color:#e76f51!important; color:#e76f51!important; }
+        .edit-btn:hover  { background:rgba(0,150,199,0.15)!important; border-color:#0096c7!important; color:#0096c7!important; }
+        .add-btn:hover   { transform:translateY(-2px) scale(1.03)!important; box-shadow:0 12px 40px rgba(0,150,199,0.5)!important; }
+        .play-btn:hover  { transform:scale(1.1)!important; }
+        .filter-chip:hover { transform:translateX(4px)!important; }
+        input::placeholder { color:rgba(3,4,94,0.3); }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter:opacity(0.5); cursor:pointer; }
+        select option { background:#e8f4f8; color:#03045e; }
+        ::-webkit-scrollbar { width:3px; }
+        ::-webkit-scrollbar-thumb { background:rgba(0,150,199,0.3); border-radius:99px; }
+        .bar1 { animation:bars 0.8s ease-in-out infinite; }
+        .bar2 { animation:bars 0.8s ease-in-out 0.15s infinite; }
+        .bar3 { animation:bars 0.8s ease-in-out 0.3s infinite; }
+      `}</style>
+
+      {/* Edit Modal */}
+      {editingJob && <EditModal job={editingJob} onSave={saveEdit} onClose={()=>setEditingJob(null)} />}
+
+      {/* Topbar */}
+      <motion.nav initial={{ opacity:0, y:-40 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6 }} className="glass" style={{ position:"sticky", top:0, zIndex:99, padding:"14px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
+          <button onClick={()=>setSidebarOpen(p=>!p)}
+            style={{ background:"rgba(0,150,199,0.1)", border:"1px solid rgba(0,150,199,0.25)", borderRadius:"10px", color:"#0096c7", width:"38px", height:"38px", cursor:"pointer", fontSize:"16px", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.3s" }}>
+            {sidebarOpen?"✕":"☰"}
+          </button>
+          <span style={{ fontSize:"12px", fontWeight:"900", letterSpacing:"7px", color:"#03045e" }}>CAREER TRACKER</span>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+          {upcomingInterviews > 0 && (
+            <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#f4a261", background:"rgba(244,162,97,0.1)", padding:"6px 14px", borderRadius:"99px", border:"1px solid rgba(244,162,97,0.3)", fontWeight:"700", animation:"pulse 2s infinite" }}>
+              {upcomingInterviews} INTERVIEW{upcomingInterviews>1?"S":""} THIS WEEK
+            </div>
+          )}
+          <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", background:"rgba(0,150,199,0.08)", padding:"6px 16px", borderRadius:"99px", border:"1px solid rgba(0,150,199,0.2)", fontWeight:"700" }}>
+            SUCCESS {successRate}%
+          </div>
+          {["Applied","Interview","Offer","Rejected"].map(s => (
+            <span key={s} style={{ fontSize:"9px", letterSpacing:"2px", padding:"5px 12px", borderRadius:"99px", background:STATUS[s].bg, color:STATUS[s].color, border:`1px solid ${STATUS[s].border}`, fontWeight:"700" }}>{s.toUpperCase()}</span>
+          ))}
+        </div>
+      </motion.nav>
+
+      <div style={{ display:"flex", flex:1 }}>
+
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <motion.aside initial={{ x:-260, opacity:0 }} animate={{ x:0, opacity:1 }} transition={{ duration:0.4, ease:"easeOut" }} style={{ width:"260px", background:"rgba(255,255,255,0.2)", backdropFilter:"blur(32px)", WebkitBackdropFilter:"blur(32px)", borderRight:"1px solid rgba(255,255,255,0.4)", display:"flex", flexDirection:"column", position:"sticky", top:"57px", height:"calc(100vh - 57px)", overflowY:"auto", boxShadow:"4px 0 32px rgba(0,150,199,0.08)" }}>
+
+            <div style={{ padding:"28px 16px 20px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
+              <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 8px", fontWeight:"700" }}>NAVIGATE</p>
+              {navItems.map((item,i) => (
+                <button key={item.id} className="nav-item"
+                  onClick={()=>item.ref ? scrollTo(item.ref,item.id) : setActiveSection("dashboard")}
+                  style={{ width:"100%", background:activeSection===item.id?"rgba(0,150,199,0.12)":"transparent", border:"none", borderRadius:"12px", color:activeSection===item.id?"#0096c7":"#4a7a99", padding:"12px 16px", fontSize:"10px", fontWeight:activeSection===item.id?"800":"400", letterSpacing:"3px", cursor:"pointer", textAlign:"left", marginBottom:"4px", transition:"all 0.25s cubic-bezier(.4,0,.2,1)", borderLeft:activeSection===item.id?"3px solid #0096c7":"3px solid transparent" }}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
+              <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 4px", fontWeight:"700" }}>SEARCH</p>
+              <input placeholder="Company or role..." value={search} onChange={e=>setSearch(e.target.value)}
+                style={{ width:"100%", background:"rgba(255,255,255,0.5)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"12px", color:"#03045e", padding:"10px 14px", fontSize:"12px", outline:"none", boxSizing:"border-box" }} />
+            </div>
+
+            <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
+              <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>QUICK STATS</p>
+              {stats.map((s,i) => (
+                <div key={s.label} className="stat-pill"
+                  onClick={()=>{ setFilter(s.key); scrollTo(jobsRef,"applications"); }}
+                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", borderRadius:"12px", marginBottom:"5px", background:filter===s.key?"rgba(0,150,199,0.12)":"rgba(255,255,255,0.3)", border:filter===s.key?"1px solid rgba(0,150,199,0.3)":"1px solid rgba(255,255,255,0.5)", cursor:"pointer", transition:"all 0.25s cubic-bezier(.4,0,.2,1)" }}>
+                  <span style={{ fontSize:"9px", letterSpacing:"2px", color:i===0?"#0096c7":"#4a7a99", fontWeight:i===0?"700":"400" }}>{s.label}</span>
+                  <span style={{ fontSize:"22px", fontWeight:"900", color:i===0?"#0096c7":"#03045e" }}><AnimatedNumber value={s.value} /></span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
+              <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>FILTER</p>
+              {FILTERS.map((f,i) => (
+                <button key={f} className="filter-chip"
+                  onClick={()=>{ setFilter(f); scrollTo(jobsRef,"applications"); }}
+                  style={{ width:"100%", background:filter===f?(f==="All"?"rgba(0,150,199,0.12)":STATUS[f]?.bg):"rgba(255,255,255,0.25)", border:filter===f?`1px solid ${f==="All"?"rgba(0,150,199,0.4)":STATUS[f]?.border}`:"1px solid rgba(255,255,255,0.5)", borderRadius:"12px", color:filter===f?(f==="All"?"#0096c7":STATUS[f]?.color):"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:filter===f?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"5px", transition:"all 0.25s", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span>{f.toUpperCase()}</span>
+                  <span style={{ fontWeight:"900", fontSize:"14px" }}>{f==="All"?jobs.length:jobs.filter(j=>j.status===f).length}</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(255,255,255,0.4)" }}>
+              <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 10px 4px", fontWeight:"700" }}>SORT BY</p>
+              {[["newest","NEWEST FIRST"],["company","COMPANY A-Z"],["status","BY STATUS"],["date","BY DATE"]].map(([val,label]) => (
+                <button key={val} onClick={()=>setSortBy(val)}
+                  style={{ width:"100%", background:sortBy===val?"rgba(0,150,199,0.1)":"transparent", border:"none", borderRadius:"12px", color:sortBy===val?"#0096c7":"#4a7a99", padding:"10px 14px", fontSize:"10px", fontWeight:sortBy===val?"800":"400", letterSpacing:"2px", cursor:"pointer", textAlign:"left", marginBottom:"3px", transition:"all 0.25s", borderLeft:sortBy===val?"3px solid #0096c7":"3px solid transparent" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding:"20px 16px" }}>
+              <p style={{ fontSize:"8px", letterSpacing:"4px", color:"#5baed6", margin:"0 0 12px 4px", fontWeight:"700" }}>AMBIENT</p>
+              <audio ref={audioRef} loop><source src={music} type="audio/mpeg" /></audio>
+              <div style={{ background:"rgba(255,255,255,0.35)", border:"1px solid rgba(255,255,255,0.6)", borderRadius:"16px", padding:"16px", backdropFilter:"blur(16px)" }}>
+                <div style={{ fontSize:"10px", letterSpacing:"3px", color:"#0096c7", marginBottom:"14px", fontWeight:"800" }}>DREAMY WAVES</div>
+                <div style={{ display:"flex", alignItems:"flex-end", gap:"3px", height:"24px", marginBottom:"14px", justifyContent:"center" }}>
+                  {isPlaying
+                    ? [1,2,3,4,5,6,7].map(i=><div key={i} className={`bar${(i%3)+1}`} style={{ width:"4px", background:"linear-gradient(180deg,#48cae4,#0096c7)", borderRadius:"2px", minHeight:"4px" }} />)
+                    : [1,2,3,4,5,6,7].map(i=><div key={i} style={{ width:"4px", height:"4px", background:"rgba(0,150,199,0.3)", borderRadius:"2px" }} />)
+                  }
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"14px" }}>
+                  <button className="play-btn" onClick={toggleMusic}
+                    style={{ background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"99px", color:"#fff", width:"40px", height:"40px", fontSize:"14px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 16px rgba(0,150,199,0.35)", flexShrink:0, transition:"all 0.25s", animation:isPlaying?"glow 2s ease-in-out infinite":"none" }}>
+                    {isPlaying?"⏸":"▶"}
+                  </button>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:"8px", letterSpacing:"2px", color:isPlaying?"#0096c7":"#90a8b8", marginBottom:"6px", fontWeight:"700" }}>{isPlaying?"NOW PLAYING":"PAUSED"}</div>
+                    <div style={{ height:"4px", background:"rgba(0,150,199,0.1)", borderRadius:"99px", overflow:"hidden" }}>
+                      <div style={{ width:isPlaying?"100%":"0%", height:"100%", background:"linear-gradient(90deg,#48cae4,#0096c7)", borderRadius:"99px", transition:isPlaying?"width 30s linear":"width 0.3s" }} />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                  <span style={{ fontSize:"9px", color:"#90a8b8", fontWeight:"700" }}>VOL</span>
+                  <input type="range" min="0" max="1" step="0.01" value={volume}
+                    onChange={e=>{ setVolume(parseFloat(e.target.value)); if(audioRef.current) audioRef.current.volume=parseFloat(e.target.value); }}
+                    style={{ flex:1, accentColor:"#0096c7", cursor:"pointer" }} />
+                  <span style={{ fontSize:"9px", color:"#0096c7", fontWeight:"900", minWidth:"28px" }}>{Math.round(volume*100)}%</span>
+                </div>
+              </div>
+            </div>
+
+          </motion.aside>
+        )}
+
+        <main style={{ flex:1, overflowX:"hidden" }}>
+
+          
+{/* Hero */}
+          <section style={{ position:"relative", textAlign:"center", padding:"140px 60px 180px", overflow:"hidden", minHeight:"520px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <motion.video autoPlay muted loop playsInline style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", objectFit:"cover", zIndex:0, y:videoY }}>
+              <source src={video} type="video/mp4" />
+            </motion.video>
+            <div style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", background:"linear-gradient(180deg,rgba(3,4,94,0.4) 0%,rgba(0,150,199,0.2) 100%)", zIndex:1 }} />
+            <motion.div style={{ position:"relative", zIndex:2, animation:"float 5s ease-in-out infinite", y:heroTextY, opacity:heroOpacity }}>
+              <motion.p
+  initial={{ opacity: 0, y: -40 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 2, delay: 1 }}
+  style={{ fontSize:"11px", letterSpacing:"8px", color:"#90e0ef", margin:"0 0 20px" }}
+>
+  YOUR JOURNEY
+</motion.p>
+              <motion.h1
+  initial={{ opacity: 0, y: 60 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 1, ease: "easeOut" }}
+  style={{ fontSize:"clamp(40px,7vw,96px)", fontWeight:"900", letterSpacing:"8px", margin:0, color:"#fff" }}
+>
+  APPLICATIONS
+</motion.h1>
+              <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ duration:1, delay:0.8 }} style={{ fontSize:"13px", color:"#caf0f8", letterSpacing:"5px", marginTop:"14px", fontWeight:"300" }}>TRACK YOUR CAREER</motion.p>
+              <div style={{ width:"60px", height:"2px", background:"linear-gradient(90deg,#48cae4,#fff)", margin:"22px auto 32px", borderRadius:"2px" }} />
+              <div style={{ display:"flex", gap:"16px", justifyContent:"center", flexWrap:"wrap" }}>
+                {[
+                  { label:"TOTAL",     value:jobs.length },
+                  { label:"SUCCESS",   value:`${successRate}%` },
+                  { label:"THIS WEEK", value:upcomingInterviews },
+                ].map((s,i) => (
+                  <div key={s.label} style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(8px)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"16px", padding:"16px 28px", color:"#fff", animation:`fadeUp 0.6s ease ${i*0.1}s both` }}>
+                    <div style={{ fontSize:"32px", fontWeight:"900", lineHeight:1 }}>{typeof s.value==="number"?<AnimatedNumber value={s.value}/>:s.value}</div>
+                    <div style={{ fontSize:"8px", letterSpacing:"3px", color:"#90e0ef", marginTop:"6px" }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </section>
+
+          {/* Add Job */}
+          <section ref={addRef} style={{ maxWidth:"880px", margin:"60px auto", padding:"0 40px" }}>
+            <div className="glass" style={{ borderRadius:"24px", padding:"40px 44px" }}>
+              <p style={{ fontSize:"9px", letterSpacing:"6px", color:"#0096c7", textAlign:"center", margin:"0 0 28px", fontWeight:"700" }}>NEW APPLICATION</p>
+              <div style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
+                <input placeholder="Company" value={company} onChange={e=>setCompany(e.target.value)}
+                  style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none" }} />
+                <input placeholder="Role" value={role} onChange={e=>setRole(e.target.value)}
+                  style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none" }} />
+                <select value={status} onChange={e=>setStatus(e.target.value)}
+                  style={{ flex:1, minWidth:"130px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none", cursor:"pointer" }}>
+                  <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
+                </select>
+                <input type="date" value={interviewDate} onChange={e=>setInterviewDate(e.target.value)}
+                  style={{ flex:1, minWidth:"140px", background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"12px", color:"#03045e", padding:"13px 16px", fontSize:"13px", outline:"none", cursor:"pointer" }} />
+                <motion.button className="add-btn" onClick={addJob} whileHover={{ scale:1.05 }} whileTap={{ scale:0.95 }}
+                  style={{ padding:"13px 32px", background:"linear-gradient(135deg,#0096c7,#48cae4)", border:"none", borderRadius:"12px", color:"#fff", fontSize:"11px", fontWeight:"800", letterSpacing:"3px", cursor:"pointer", boxShadow:"0 4px 16px rgba(0,150,199,0.25)", transition:"all 0.25s" }}>
+                  ADD
+                </motion.button>
+              </div>
+            </div>
+          </section>
+
+          {/* Jobs */}
+          <section ref={jobsRef} style={{ maxWidth:"1000px", margin:"0 auto", padding:"0 40px 100px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"24px", flexWrap:"wrap", gap:"12px" }}>
+              <p style={{ fontSize:"9px", letterSpacing:"5px", color:"#0096c7", margin:0, fontWeight:"700" }}>
+                {displayed.length} {filter==="All"?"APPLICATIONS":filter.toUpperCase()}{search?` · "${search}"`:""}
+              </p>
+              {filter!=="All" && (
+                <button onClick={()=>setFilter("All")}
+                  style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(0,150,199,0.25)", borderRadius:"99px", color:"#0096c7", padding:"5px 16px", fontSize:"9px", letterSpacing:"2px", cursor:"pointer", fontWeight:"700" }}>
+                  CLEAR FILTER
+                </button>
+              )}
+            </div>
+
+            <AnimatePresence>
+<div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+              {displayed.map((job,idx) => (
+                <motion.div className="job-card sketch-border" key={job.id} initial={{ opacity:0, y:50 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }} transition={{ duration:0.5, delay:idx*0.08 }}  whileHover={{ scale:1.01, y:-3 }} transition={{ type:"spring", stiffness:300, damping:20 }}                  style={{ background:flash===job.id?"rgba(0,150,199,0.08)":"rgba(255,255,255,0.35)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", border:`1px solid ${flash===job.id?"rgba(0,150,199,0.4)":"rgba(255,255,255,0.6)"}`, borderLeft:`4px solid ${STATUS[job.status]?.color}`, borderRadius:"18px", padding:"22px 28px", boxShadow:`0 4px 24px ${STATUS[job.status]?.glow},inset 0 1px 0 rgba(255,255,255,0.7)`, transition:"all 0.3s cubic-bezier(.4,0,.2,1)", animation:isUrgent(job.interview_date)?"urgentPulse 2s ease-in-out infinite":`fadeUp 0.4s ease ${idx*0.04}s both` }}>
+
+                  <div style={{ display:"flex", alignItems:"center", gap:"14px", flexWrap:"wrap", marginBottom:"16px" }}>
+                    <span style={{ fontSize:"10px", color:"rgba(0,150,199,0.5)", minWidth:"28px", fontWeight:"700" }}>#{idx+1}</span>
+                    <span style={{ flex:2, fontSize:"14px", fontWeight:"800", letterSpacing:"2px", color:"#03045e" }}>{job.company.toUpperCase()}</span>
+                    <span style={{ flex:2, fontSize:"12px", color:"#0096c7", fontWeight:"500" }}>{job.role}</span>
+                    {job.interview_date && (
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"rgba(255,255,255,0.5)", border:"1px solid rgba(255,255,255,0.7)", borderRadius:"99px", padding:"4px 12px" }}>
+                        <span style={{ fontSize:"9px", color:"#4a7a99", letterSpacing:"1px" }}>
+                          {new Date(job.interview_date).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })}
+                        </span>
+                        <DaysUntil date={job.interview_date} />
+                      </div>
+                    )}
+                    <span style={{ padding:"5px 14px", borderRadius:"99px", fontSize:"9px", fontWeight:"800", letterSpacing:"2px", background:STATUS[job.status]?.bg, color:STATUS[job.status]?.color, border:`1px solid ${STATUS[job.status]?.border}` }}>
+                      {job.status.toUpperCase()}
+                    </span>
+                    <select value={job.status} onChange={e=>updateStatus(job,e.target.value)}
+                      style={{ background:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.8)", borderRadius:"10px", color:"#03045e", padding:"7px 10px", fontSize:"11px", outline:"none", cursor:"pointer" }}>
+                      <option>Applied</option><option>Interview</option><option>Rejected</option><option>Offer</option>
+                    </select>
+                    <button className="edit-btn" onClick={()=>setEditingJob(job)}
+                      style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(0,150,199,0.2)", borderRadius:"10px", color:"#0096c7", padding:"7px 14px", fontSize:"10px", cursor:"pointer", transition:"all 0.2s", fontWeight:"700" }}>
+                      EDIT
+                    </button>
+                    <button className="del-btn" onClick={()=>deleteJob(job.id)}
+                      style={{ background:"rgba(255,255,255,0.4)", border:"1px solid rgba(231,111,81,0.25)", borderRadius:"10px", color:"#e76f51", padding:"7px 14px", fontSize:"10px", cursor:"pointer", transition:"all 0.2s", fontWeight:"700" }}>
+                      REMOVE
+                    </button>
+                  </div>
+
+                  <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+                    <span style={{ fontSize:"8px", letterSpacing:"2px", color:"rgba(0,150,199,0.6)", minWidth:"56px", fontWeight:"700" }}>PROGRESS</span>
+                    <div style={{ flex:1 }}><ProgressBar status={job.status} /></div>
+                    <span style={{ fontSize:"8px", letterSpacing:"2px", color:STATUS[job.status]?.color, minWidth:"72px", textAlign:"right", fontWeight:"800" }}>
+                      {job.status==="Rejected"?"CLOSED":job.status==="Offer"?"COMPLETE":"IN PROGRESS"}
+                    </span>
+                  </div>
+
+                </motion.div>
+              ))}
+              {displayed.length===0 && (
+                <div className="glass" style={{ textAlign:"center", padding:"60px", fontSize:"11px", letterSpacing:"4px", color:"#0096c7", borderRadius:"18px" }}>
+                  NO {filter==="All"?"":filter.toUpperCase()} APPLICATIONS YET
+                </div>
+              )}
+            </div>
+            </AnimatePresence>
+          </section>
+
+          <footer className="glass" style={{ padding:"24px 40px", display:"flex", justifyContent:"space-between", borderTop:"1px solid rgba(255,255,255,0.4)", borderRadius:0 }}>
+            <span style={{ fontSize:"11px", letterSpacing:"5px", color:"#03045e", fontWeight:"900" }}>CAREER TRACKER</span>
+            <span style={{ fontSize:"10px", letterSpacing:"4px", color:"#0096c7", fontWeight:"700" }}>RIDE THE WAVE 2025</span>
+          </footer>
+
+        </main>
+      </div>
+    </div>
+  );
+}
