@@ -339,6 +339,30 @@ function JobCard({ job, onDelete, onEdit }) {
       </div>
 
       <ProgressBar status={job.status} />
+      {job.interview_date && (
+        <motion.a
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Interview+at+${encodeURIComponent(job.company)}&details=Role:+${encodeURIComponent(job.role)}&dates=${job.interview_date.replace(/-/g, "")}T090000Z/${job.interview_date.replace(/-/g, "")}T100000Z`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-block",
+            marginTop: 10,
+            padding: "5px 14px",
+            borderRadius: 8,
+            background: `${COLORS.teal}18`,
+            border: `1.2px solid ${COLORS.teal}`,
+            color: COLORS.teal,
+            fontFamily: "'Caveat', cursive",
+            fontSize: "0.88rem",
+            fontWeight: 700,
+            textDecoration: "none",
+          }}
+        >
+          📅 Add to Google Calendar
+        </motion.a>
+      )}
     </motion.div>
   );
 }
