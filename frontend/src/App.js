@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import * as THREE from 'three';
 import { motion, AnimatePresence, useSpring } from "framer-motion";
 
 // ─── Google Fonts injected at runtime ───────────────────────────────────────
@@ -47,6 +48,108 @@ const GS = {
     overflowX: "hidden",
   },
 };
+
+// ─── Cursor watercolor trail ─────────────────────────────────────────────────
+function CursorTrail() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    let dots = [];
+    const colors = ["#d4818a","#6aaba0","#d4a85a","#9b8ec4","#7aab7a","#e8a87c"];
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize();
+    window.addEventListener("resize", resize);
+    const onMove = (e) => {
+      dots.push({ x: e.clientX, y: e.clientY, r: 4 + Math.random() * 4, color: colors[Math.floor(Math.random() * colors.length)], alpha: 0.18, life: 1 });
+      if (dots.length > 40) dots.shift();
+    };
+    window.addEventListener("mousemove", onMove);
+    let raf;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      dots = dots.filter(d => d.life > 0.01);
+      dots.forEach(d => {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fillStyle = d.color;
+        ctx.globalAlpha = d.alpha * d.life;
+        ctx.fill();
+        d.life *= 0.88;
+        d.r *= 1.04;
+      });
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("mousemove", onMove); window.removeEventListener("resize", resize); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 3 }} />;
+}
+
+// ─── Ink ripple on click ──────────────────────────────────────────────────────
+function InkRipple() {
+  const [ripples, setRipples] = useState([]);
+  useEffect(() => {
+    const onClick = (e) => {
+      const id = Date.now() + Math.random(); // Ensure completely unique ID
+      const colors = ["#d4818a","#6aaba0","#d4a85a","#9b8ec4","#7aab7a"];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      setRipples(r => [...r, { id, x: e.clientX, y: e.clientY, color }]);
+      setTimeout(() => setRipples(r => r.filter(rr => rr.id !== id)), 900);
+    };
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, []);
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 4 }}>
+      {ripples.map(r => (
+        <motion.div key={r.id}
+          initial={{ width: 0, height: 0, opacity: 0.5, x: r.x, y: r.y }}
+          animate={{ width: 120, height: 120, opacity: 0, x: r.x - 60, y: r.y - 60 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          style={{ position: "absolute", borderRadius: "50%", border: `2px solid ${r.color}`, background: `${r.color}22` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Paint splatter confetti ──────────────────────────────────────────────────
+function PaintSplatter({ trigger }) {
+  const [particles, setParticles] = useState([]);
+  useEffect(() => {
+    if (!trigger) return;
+    const colors = ["#d4818a","#6aaba0","#d4a85a","#9b8ec4","#7aab7a","#e8a87c","#2c1e0f"];
+    const newP = Array.from({ length: 28 }, (_, i) => ({
+      id: i,
+      color: colors[i % colors.length],
+      x: Math.random() * window.innerWidth,
+      y: -20,
+      tx: (Math.random() - 0.5) * 300,
+      ty: 200 + Math.random() * 300,
+      r: 6 + Math.random() * 10,
+      rot: Math.random() * 360,
+    }));
+    setParticles(newP);
+    setTimeout(() => setParticles([]), 1400);
+  }, [trigger]);
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 50 }}>
+      <AnimatePresence>
+        {particles.map(p => (
+          <motion.div key={p.id}
+            initial={{ x: p.x, y: p.y, opacity: 1, scale: 1, rotate: 0 }}
+            animate={{ x: p.x + p.tx, y: p.y + p.ty, opacity: 0, scale: 0.3, rotate: p.rot }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            style={{ position: "absolute", width: p.r, height: p.r, borderRadius: "50%", background: p.color }}
+          />
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 // ─── SVG watercolor blobs rendered as background ─────────────────────────────
 function WatercolorCanvas() {
@@ -120,6 +223,114 @@ function WatercolorCanvas() {
 }
 
 // ─── Paper texture grain overlay ────────────────────────────────────────────
+function FloatingOrigami() {
+  const mountRef = useRef(null);
+  useEffect(() => {
+    const el = mountRef.current;
+    if (!el) return;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(el.offsetWidth, el.offsetHeight);
+    el.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, el.offsetWidth / el.offsetHeight, 0.1, 100);
+    camera.position.set(0, 0, 10);
+    const mouse = { x: 0, y: 0 };
+    const onMove = e => {
+      mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouse.y = -(e.clientY / window.innerHeight - 0.5) * 2;
+    };
+    window.addEventListener('mousemove', onMove);
+    scene.add(new THREE.AmbientLight(0xfff8f0, 0.8));
+    const dl = new THREE.DirectionalLight(0xffeedd, 1.2);
+    dl.position.set(3, 5, 5);
+    scene.add(dl);
+    const colors = [0xd4818a, 0x6aaba0, 0xd4a85a, 0x9b8ec4, 0x7aab7a, 0xe8a87c];
+    const cards = [];
+    for (let i = 0; i < 10; i++) {
+      const g = new THREE.Group();
+      const c = colors[i % colors.length];
+      const mat = new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+      g.add(new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.6), mat));
+      const cornerShape = new THREE.Shape();
+      cornerShape.moveTo(0, 0);
+      cornerShape.lineTo(0.4, 0);
+      cornerShape.lineTo(0, -0.4);
+      cornerShape.closePath();
+      const cornerMat = new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+      const corner = new THREE.Mesh(new THREE.ShapeGeometry(cornerShape), cornerMat);
+      corner.position.set(0.4, 0.6, 0.01);
+      g.add(corner);
+      for (let j = 0; j < 3; j++) {
+        const line = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.7, 0.02),
+          new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 })
+        );
+        line.position.set(-0.1, 0.1 - j * 0.28, 0.01);
+        g.add(line);
+      }
+      const angle = (i / 10) * Math.PI * 2;
+      const r = 3 + Math.random() * 2;
+      g.position.set(
+        Math.cos(angle) * r,
+        Math.sin(angle) * r * 0.5 + (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 4
+      );
+      g.rotation.set(
+        (Math.random() - 0.5) * 0.5,
+        (Math.random() - 0.5) * 0.5,
+        (Math.random() - 0.5) * 0.8
+      );
+      scene.add(g);
+      cards.push({
+        mesh: g,
+        speed: 0.003 + Math.random() * 0.004,
+        phase: Math.random() * Math.PI * 2,
+        amp: 0.2 + Math.random() * 0.2,
+        rotS: (Math.random() - 0.5) * 0.005,
+        baseY: g.position.y,
+        baseX: g.position.x
+      });
+    }
+    let t = 0, raf;
+    const animate = () => {
+      raf = requestAnimationFrame(animate);
+      t++;
+      cards.forEach(card => {
+        card.mesh.position.y = card.baseY + Math.sin(t * card.speed + card.phase) * card.amp;
+        card.mesh.position.x = card.baseX + Math.cos(t * card.speed * 0.7 + card.phase) * card.amp * 0.4;
+        card.mesh.rotation.z += card.rotS;
+        card.mesh.rotation.y += card.rotS * 0.5;
+      });
+      camera.position.x += (mouse.x * 2 - camera.position.x) * 0.03;
+      camera.position.y += (mouse.y - camera.position.y) * 0.03;
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+    };
+    animate();
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('mousemove', onMove);
+      renderer.dispose();
+      if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
+    };
+  }, []);
+  return (
+    <div
+      ref={mountRef}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        width: '100%',
+        height: '100%',
+      }}
+    />
+  );
+}
+
 function PaperGrain() {
   return (
     <svg
@@ -174,8 +385,16 @@ function InkSplatter({ x, y, r = 4, color = COLORS.inkLight, opacity = 0.3 }) {
 function AnimatedNumber({ value }) {
   const spring = useSpring(0, { stiffness: 80, damping: 20 });
   const [display, setDisplay] = useState(0);
-  useEffect(() => { spring.set(value); }, [value, spring]);
-  useEffect(() => spring.on("change", (v) => setDisplay(Math.round(v))), [spring]);
+  
+  useEffect(() => { 
+    spring.set(value); 
+  }, [value, spring]);
+  
+  useEffect(() => {
+    // Return the unsubscribe function properly
+    return spring.on("change", (v) => setDisplay(Math.round(v)));
+  }, [spring]);
+
   return <span>{display}</span>;
 }
 
@@ -256,25 +475,32 @@ function ProgressBar({ status }) {
 // ─── Job Card ─────────────────────────────────────────────────────────────────
 function JobCard({ job, onDelete, onEdit }) {
   const accent = STATUS_COLORS[job.status] || COLORS.teal;
+  const [flipped, setFlipped] = useState(false);
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -80 }}
-      whileHover={{ y: -4, boxShadow: `0 12px 36px ${accent}28` }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      style={{
-        background: `${COLORS.paper}e8`,
-        border: `1.5px solid ${COLORS.border}`,
-        borderLeft: `4px solid ${accent}`,
-        borderRadius: 14,
-        padding: "18px 20px 14px",
-        position: "relative",
-        backdropFilter: "blur(4px)",
-        cursor: "default",
-      }}
+      style={{ perspective: 1000, cursor: "default" }}
+      onHoverStart={() => setFlipped(true)}
+      onHoverEnd={() => setFlipped(false)}
     >
+      <motion.div
+        animate={{ rotateY: flipped ? 8 : 0, y: flipped ? -4 : 0, boxShadow: flipped ? `0 18px 40px ${accent}35` : `0 2px 8px ${accent}15` }}
+        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+        style={{
+          background: `${COLORS.paper}e8`,
+          border: `1.5px solid ${COLORS.border}`,
+          borderLeft: `4px solid ${accent}`,
+          borderRadius: 14,
+          padding: "18px 20px 14px",
+          position: "relative",
+          backdropFilter: "blur(4px)",
+          transformStyle: "preserve-3d",
+        }}
+      >
       {/* torn paper top edge decoration */}
       <svg
         style={{ position: "absolute", top: -1, left: 0, width: "100%", pointerEvents: "none" }}
@@ -363,9 +589,12 @@ function JobCard({ job, onDelete, onEdit }) {
           📅 Add to Google Calendar
         </motion.a>
       )}
+      </motion.div>
     </motion.div>
   );
 }
+
+// ─── Button Style Helper ─────────────────────────────────────────────────────
 function btnStyle(color) {
   return {
     background: `${color}18`,
@@ -708,217 +937,117 @@ function Navbar({ onAdd }) {
         borderBottom: `1.5px solid ${COLORS.border}`,
         display: "flex",
         alignItems: "center",
+        padding: "16px 32px",
         justifyContent: "space-between",
-        padding: "14px 32px",
       }}
     >
-      <div style={{ fontFamily: "'Caveat', cursive", fontSize: "1.1rem", color: COLORS.inkLight, fontStyle: "italic" }}>
-        ☀️ Good luck, Arun — every application is a brushstroke.
+      <div style={{ fontFamily: "'Caveat', cursive", fontSize: "1.5rem", fontWeight: 700, color: COLORS.ink }}>
+        Your Applications
       </div>
       <motion.button
-        whileHover={{ scale: 1.07 }}
-        whileTap={{ scale: 0.94 }}
-        onClick={onAdd}
-        style={{
-          background: COLORS.rose,
-          border: "none",
-          borderRadius: 12,
-          padding: "9px 20px",
-          cursor: "pointer",
-          fontFamily: "'Caveat', cursive",
-          fontSize: "1.05rem",
-          fontWeight: 700,
-          color: "#fff",
-          boxShadow: `0 4px 18px ${COLORS.rose}44`,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        + Add Job
-      </motion.button>
-    </motion.nav>
-  );
-}
-
-// ─── Hero section ─────────────────────────────────────────────────────────────
-function Hero() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
-      style={{
-        padding: "48px 40px 32px",
-        position: "relative",
-      }}
-    >
-      <InkSplatter x={-10} y={10} r={3} color={COLORS.rose} opacity={0.4} />
-      <InkSplatter x={340} y={-5} r={2} color={COLORS.teal} opacity={0.35} />
-      <h1
-        style={{
-          fontFamily: "'Caveat', cursive",
-          fontSize: "clamp(2.2rem, 4vw, 3.2rem)",
-          fontWeight: 700,
-          color: COLORS.ink,
-          lineHeight: 1.15,
-          margin: 0,
-        }}
-      >
-        My Job Hunt
-        <br />
-        <span style={{ color: COLORS.rose }}>Journal</span>
-      </h1>
-      <p
-        style={{
-          fontFamily: "'Lora', serif",
-          fontStyle: "italic",
-          color: COLORS.inkLight,
-          fontSize: "1rem",
-          marginTop: 10,
-          maxWidth: 420,
-        }}
-      >
-        Every company is a new page. Keep painting the picture.
-      </p>
-      {/* hand-drawn wavy rule */}
-      <svg width="280" height="12" viewBox="0 0 280 12" style={{ marginTop: 12 }}>
-        <path
-          d="M0,6 Q14,2 28,8 T56,6 T84,8 T112,5 T140,8 T168,5 T196,8 T224,5 T252,8 T280,6"
-          stroke={COLORS.amber}
-          strokeWidth="2.5"
-          fill="none"
-          strokeLinecap="round"
-        />
-      </svg>
-    </motion.div>
-  );
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-function EmptyState({ onAdd }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      style={{ textAlign: "center", padding: "80px 24px" }}
-    >
-      <svg width="120" height="120" viewBox="0 0 120 120" style={{ marginBottom: 16 }}>
-        <ellipse cx="60" cy="60" rx="50" ry="50" fill={COLORS.teal} opacity="0.12" />
-        <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle" fontSize="48">
-          🎨
-        </text>
-      </svg>
-      <div style={{ fontFamily: "'Caveat', cursive", fontSize: "1.6rem", color: COLORS.ink, fontWeight: 700 }}>
-        Your canvas is blank!
-      </div>
-      <div style={{ color: COLORS.inkLight, fontSize: "0.9rem", marginTop: 6, fontStyle: "italic" }}>
-        Add your first job application to start painting your story.
-      </div>
-      <motion.button
-        whileHover={{ scale: 1.06 }}
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={onAdd}
         style={{
-          marginTop: 20,
-          background: COLORS.rose,
+          background: COLORS.teal,
+          color: "#fff",
           border: "none",
-          borderRadius: 12,
-          padding: "11px 28px",
-          cursor: "pointer",
+          padding: "8px 20px",
+          borderRadius: 99,
           fontFamily: "'Caveat', cursive",
           fontSize: "1.1rem",
           fontWeight: 700,
-          color: "#fff",
-          boxShadow: `0 4px 18px ${COLORS.rose}44`,
+          cursor: "pointer",
+          boxShadow: `0 4px 12px ${COLORS.teal}55`,
         }}
       >
-        + Add first job
+        ➕ Add New
       </motion.button>
-    </motion.div>
+    </motion.nav>
   );
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editJob, setEditJob] = useState(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState("newest");
-  const [error, setError] = useState(null);
+  
+  const [modalData, setModalData] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [confetti, setConfetti] = useState(false);
 
-  // ── Fetch all jobs ──
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
   const fetchJobs = async () => {
     try {
-      setLoading(true);
       const res = await fetch(`${API}/jobs`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      
-setJobs(data.jobs || data);
-    } catch (e) {
-      setError("Couldn't connect to the backend. Is Render awake?");
-    } finally {
-      setLoading(false);
+      if (res.ok) {
+        const data = await res.json();
+        setJobs(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch jobs", err);
     }
   };
 
-  useEffect(() => { fetchJobs(); }, []);
+  const handleSave = async (job) => {
+    const isEdit = !!job.id;
+    const method = isEdit ? "PUT" : "POST";
+    const url = isEdit ? `${API}/jobs/${job.id}` : `${API}/jobs`;
 
-  // ── Add job ──
-  const handleAdd = async (form) => {
-    const body = {
-      company: form.company,
-      role: form.role,
-      status: form.status,
-      interview_date: form.interview_date || null,
-    };
-    await fetch(`${API}/jobs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setModalOpen(false);
-    fetchJobs();
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(job),
+      });
+      if (res.ok) {
+        // Trigger confetti if a new offer is received
+        if (job.status === "offer" && (!isEdit || modalData?.status !== "offer")) {
+          setConfetti(true);
+          setTimeout(() => setConfetti(false), 2000);
+        }
+        fetchJobs();
+        setShowModal(false);
+      }
+    } catch (err) {
+      console.error("Failed to save job", err);
+    }
   };
 
-  // ── Update job ──
-  const handleUpdate = async (form) => {
-    const body = {
-      company: form.company,
-      role: form.role,
-      status: form.status,
-      interview_date: form.interview_date || null,
-    };
-    await fetch(`${API}/jobs/${editJob.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setEditJob(null);
-    fetchJobs();
-  };
-
-  // ── Delete job ──
   const handleDelete = async (id) => {
-    await fetch(`${API}/jobs/${id}`, { method: "DELETE" });
-    fetchJobs();
+    try {
+      await fetch(`${API}/jobs/${id}`, { method: "DELETE" });
+      fetchJobs();
+    } catch (err) {
+      console.error("Failed to delete job", err);
+    }
   };
 
-  // ── Filter + sort ──
-  const visible = jobs
-    .filter((j) => {
-      const matchFilter = filter === "all" || j.status === filter;
-      const q = search.toLowerCase();
-      const matchSearch = !q || j.company.toLowerCase().includes(q) || j.role.toLowerCase().includes(q);
-      return matchFilter && matchSearch;
-    })
+  const filteredJobs = jobs
+    .filter((j) => filter === "all" || j.status === filter)
+    .filter((j) => 
+      j.company.toLowerCase().includes(search.toLowerCase()) || 
+      j.role.toLowerCase().includes(search.toLowerCase())
+    )
     .sort((a, b) => {
-      if (sort === "newest") return b.id - a.id;
-      if (sort === "oldest") return a.id - b.id;
+      // Adjusted ID logic to safeguard against UUIDs/string IDs resulting in NaN
+      if (sort === "newest") {
+        const numA = Number(a.id);
+        const numB = Number(b.id);
+        if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+        return String(b.id || "").localeCompare(String(a.id || ""));
+      }
+      if (sort === "oldest") {
+        const numA = Number(a.id);
+        const numB = Number(b.id);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return String(a.id || "").localeCompare(String(b.id || ""));
+      }
       if (sort === "company") return a.company.localeCompare(b.company);
       if (sort === "interview") {
         if (!a.interview_date) return 1;
@@ -930,88 +1059,67 @@ setJobs(data.jobs || data);
 
   return (
     <div style={GS.app}>
-      {/* Watercolor background */}
+      {/* Background Effects */}
+      <CursorTrail />
+      <InkRipple />
+      <PaintSplatter trigger={confetti} />
+      <FloatingOrigami />
       <WatercolorCanvas />
       <PaperGrain />
 
-      {/* Layout */}
-      <div style={{ position: "relative", zIndex: 5, display: "flex", minHeight: "100vh" }}>
-        {/* Sidebar */}
-        <Sidebar
-          jobs={jobs}
-          search={search}
-          setSearch={setSearch}
-          filter={filter}
-          setFilter={setFilter}
-          sort={sort}
-          setSort={setSort}
+      <div style={{ display: "flex", position: "relative", zIndex: 10 }}>
+        <Sidebar 
+          jobs={jobs} 
+          search={search} setSearch={setSearch} 
+          filter={filter} setFilter={setFilter} 
+          sort={sort} setSort={setSort} 
         />
-
-        {/* Main content */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <Navbar onAdd={() => { setEditJob(null); setModalOpen(true); }} />
-          <Hero />
-
-          <main style={{ padding: "0 32px 48px", flex: 1 }}>
-            {loading ? (
-              <motion.div
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ repeat: Infinity, duration: 1.6 }}
-                style={{
-                  textAlign: "center",
-                  padding: 60,
-                  fontFamily: "'Caveat', cursive",
-                  fontSize: "1.4rem",
-                  color: COLORS.inkLight,
-                }}
-              >
-                🎨 Loading your canvas…
-              </motion.div>
-            ) : error ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: 60,
-                  color: COLORS.rose,
-                  fontFamily: "'Caveat', cursive",
-                  fontSize: "1.2rem",
-                }}
-              >
-                ⚠️ {error}
-              </div>
-            ) : visible.length === 0 ? (
-              <EmptyState onAdd={() => { setEditJob(null); setModalOpen(true); }} />
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                  gap: 20,
-                }}
-              >
-                <AnimatePresence>
-                  {visible.map((job) => (
-                    <JobCard
-                      key={job.id}
-                      job={job}
-                      onDelete={handleDelete}
-                      onEdit={(j) => { setEditJob(j); setModalOpen(true); }}
-                    />
-                  ))}
-                </AnimatePresence>
+        
+        <main style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+          <Navbar onAdd={() => { setModalData(null); setShowModal(true); }} />
+          
+          <div style={{ flex: 1, overflowY: "auto", padding: "32px" }}>
+            <motion.div 
+              layout
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: 24,
+              }}
+            >
+              <AnimatePresence>
+                {filteredJobs.map((job) => (
+                  <JobCard 
+                    key={job.id} 
+                    job={job} 
+                    onDelete={handleDelete} 
+                    onEdit={(j) => { setModalData(j); setShowModal(true); }} 
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+            
+            {filteredJobs.length === 0 && (
+              <div style={{ 
+                textAlign: "center", 
+                marginTop: 80, 
+                color: COLORS.inkLight, 
+                fontFamily: "'Caveat', cursive", 
+                fontSize: "1.6rem" 
+              }}>
+                No jobs found... Time to apply? 🖌️
               </div>
             )}
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
 
-      {/* Modal */}
       <AnimatePresence>
-        {modalOpen && (
-          <JobModal
-            job={editJob}
-            onClose={() => { setModalOpen(false); setEditJob(null); }}
-            onSave={editJob ? handleUpdate : handleAdd}
+        {showModal && (
+          <JobModal 
+            job={modalData} 
+            onClose={() => setShowModal(false)} 
+            onSave={handleSave} 
           />
         )}
       </AnimatePresence>
