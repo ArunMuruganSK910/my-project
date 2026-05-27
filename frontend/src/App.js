@@ -987,7 +987,7 @@ export default function App() {
       const res = await fetch(`${API}/jobs`);
       if (res.ok) {
         const data = await res.json();
-        setJobs(data);
+        setJobs(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error("Failed to fetch jobs", err);
