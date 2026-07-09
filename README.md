@@ -1,7 +1,7 @@
 # 🎨 Job Tracker App
 A full-stack web application to track job applications — built with a watercolor painter's sketchbook theme.
 
-> Built by **Arun** as Project 1 of a 4-project portfolio to land an entry-level dev role.
+
 
 ## 🌐 Live Demo
 | Service | URL |
